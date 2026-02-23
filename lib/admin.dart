@@ -35,7 +35,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       "period": "Monthly"
     },
   ];
-
+// initial
   List<Map<String, dynamic>> get filteredLogs {
     if (selectedFilter == "All") return attendanceLogs;
     return attendanceLogs.where((log) => log['period'] == selectedFilter).toList();
