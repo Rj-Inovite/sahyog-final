@@ -1,0 +1,270 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+
+class GirlProfile extends StatefulWidget {
+  final Map<String, String> userData;
+  const GirlProfile({super.key, required this.userData});
+
+  @override
+  State<GirlProfile> createState() => _GirlProfileState();
+}
+
+class _GirlProfileState extends State<GirlProfile> {
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+
+  // Premium Girl Theme Palette
+  final Color softPink = const Color(0xFFFFE4E9);
+  final Color deepRose = const Color(0xFFD81B60);
+  final Color accentPink = const Color(0xFFFF80AB);
+  final Color creamWhite = const Color(0xFFFFFDFD);
+  final Color textGrey = const Color(0xFF5F6368);
+
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? pickedFile = await _picker.pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
+
+  void _showImageSourceActionSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Update Your Photo", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 15),
+            ListTile(
+              leading: Icon(Icons.photo_library, color: deepRose),
+              title: const Text("Gallery"),
+              onTap: () { _pickImage(ImageSource.gallery); Navigator.pop(context); },
+            ),
+            ListTile(
+              leading: Icon(Icons.camera_alt, color: deepRose),
+              title: const Text("Camera"),
+              onTap: () { _pickImage(ImageSource.camera); Navigator.pop(context); },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String name = widget.userData['name'] ?? "Student";
+    final String email = widget.userData['email'] ?? "not-provided@college.com";
+    final String room = widget.userData['room'] ?? "101";
+
+    return Scaffold(
+      backgroundColor: creamWhite,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- 1. ELEGANT HEADER SECTION ---
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  height: 280,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [softPink, accentPink],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(60),
+                      bottomRight: Radius.circular(60),
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(icon: Icon(Icons.arrow_back_ios, color: deepRose), onPressed: () => Navigator.pop(context)),
+                            Text("MY SPACE", style: TextStyle(color: deepRose, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
+                            IconButton(icon: Icon(Icons.settings_heart, color: deepRose), onPressed: () {}),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Profile Picture Overlay
+                Positioned(
+                  bottom: -60,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(color: deepRose.withOpacity(0.2), blurRadius: 25, offset: const Offset(0, 10))
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 75,
+                            backgroundColor: softPink,
+                            backgroundImage: _imageFile != null ? FileImage(_imageFile!) : null,
+                            child: _imageFile == null 
+                                ? Icon(Icons.face_retouching_natural, size: 80, color: deepRose) 
+                                : null,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 5,
+                          right: 5,
+                          child: GestureDetector(
+                            onTap: _showImageSourceActionSheet,
+                            child: CircleAvatar(
+                              backgroundColor: deepRose,
+                              radius: 20,
+                              child: const Icon(Icons.auto_fix_high, color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 75),
+
+            // --- 2. USER IDENTITY ---
+            Text(
+              name,
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300, color: deepRose, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: softPink,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                "Residence: $room • Block A",
+                style: TextStyle(color: deepRose, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // --- 3. SOFT GLASS INFO CARDS ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  _infoTile(Icons.alternate_email, "Email", email),
+                  const Divider(height: 1, color: Color(0xFFFCE4EC)),
+                  _infoTile(Icons.favorite_border, "Blood Group", "A+ Positive"),
+                  const Divider(height: 1, color: Color(0xFFFCE4EC)),
+                  _infoTile(Icons.school_outlined, "Degree", "B.Tech Design"),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // --- 4. ATTENDANCE SECTION ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 25),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: softPink),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Attendance Score", style: TextStyle(color: textGrey, fontWeight: FontWeight.bold)),
+                        Text("96%", style: TextStyle(color: deepRose, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: LinearProgressIndicator(
+                        value: 0.96,
+                        minHeight: 12,
+                        backgroundColor: softPink,
+                        color: accentPink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 50),
+
+            // --- 5. LOGOUT ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(color: softPink),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout, color: deepRose, size: 18),
+                      const SizedBox(width: 10),
+                      Text("END SESSION", style: TextStyle(color: deepRose, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoTile(IconData icon, String title, String subtitle) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: softPink.withOpacity(0.3), shape: BoxShape.circle),
+        child: Icon(icon, color: deepRose, size: 22),
+      ),
+      title: Text(title, style: TextStyle(color: textGrey, fontSize: 12, fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+    );
+  }
+}
