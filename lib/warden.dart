@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 // --- THEME CONSTANTS ---
 const Color sunsetOrange = Color(0xFFFF8C42);
 const Color warmYellow = Color(0xFFF9D423);
-const Color primaryAmber = Color(0xFFFFB300);
 const Color backgroundWhite = Color(0xFFFAFAFA);
 const Color textDark = Color(0xFF2D3436);
 
@@ -12,7 +11,7 @@ void main() => runApp(const MaterialApp(
       home: WardenDashboard(userData: {'name': 'Chief Warden'}),
     ));
 
-// --- MAIN DASHBOARD WITH PERSISTENT NAV ---
+// --- MAIN DASHBOARD ---
 class WardenDashboard extends StatefulWidget {
   final Map<String, String> userData;
   const WardenDashboard({super.key, required this.userData});
@@ -36,23 +35,25 @@ class _WardenDashboardState extends State<WardenDashboard> {
     return Scaffold(
       backgroundColor: backgroundWhite,
       appBar: AppBar(
-        title: const Text("Sahyog Warden Console", 
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text("Sahyog Warden Console",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
         backgroundColor: sunsetOrange,
         elevation: 4,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, size: 30),
+            icon: const Icon(Icons.account_circle, size: 30, color: Colors.white),
             onPressed: () {
-              // Redirection to warden_profile.dart
-              print("Navigating to warden_profile.dart");
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const WardenProfilePage()),
+              );
             },
           ),
         ],
       ),
       body: _pages[_currentIndex],
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
         ),
         child: BottomNavigationBar(
@@ -96,7 +97,7 @@ class ConsoleHome extends StatelessWidget {
                 const SizedBox(height: 15),
                 _buildModuleGrid(context),
                 const SizedBox(height: 30),
-                const ShinyAuthButton(), // The Custom Animated Button
+            //    const ShinyAuthButton(),
                 const SizedBox(height: 20),
               ],
             ),
@@ -176,7 +177,11 @@ class ConsoleHome extends StatelessWidget {
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => target)),
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -188,7 +193,7 @@ class ConsoleHome extends StatelessWidget {
     );
   }
 }
-
+/*
 // --- ANIMATED SHINY BUTTON ---
 class ShinyAuthButton extends StatefulWidget {
   const ShinyAuthButton({super.key});
@@ -228,7 +233,7 @@ class _ShinyAuthButtonState extends State<ShinyAuthButton> with SingleTickerProv
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            boxShadow: [BoxShadow(color: sunsetOrange.withOpacity(0.3), blurRadius: 10)],
+            boxShadow: [BoxShadow(color: sunsetOrange.withValues(alpha: 0.3), blurRadius: 10)],
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -236,9 +241,9 @@ class _ShinyAuthButtonState extends State<ShinyAuthButton> with SingleTickerProv
               shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
-            onPressed: () => print("Navigating to warden_scan.dart"),
-            child: const Text("ADMINISTRATOR AUTHENTICATION", 
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminAuthPage())),
+            child: const Text("ADMINISTRATOR AUTHENTICATION",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
           ),
         );
       },
@@ -246,36 +251,91 @@ class _ShinyAuthButtonState extends State<ShinyAuthButton> with SingleTickerProv
   }
 }
 
-// --- 2. ROOM INVENTORY (WITH RESIDENT NAMES) ---
+// --- ADMINISTRATOR AUTHENTICATION PAGE ---
+class AdminAuthPage extends StatelessWidget {
+  const AdminAuthPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Admin Secure Portal"), backgroundColor: Colors.black87),
+      body: Padding(
+        padding: const EdgeInsets.all(25.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_person, size: 80, color: sunsetOrange),
+            const SizedBox(height: 20),
+            const Text("Security Verification Required", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            const Text("Please verify your biometrics or enter your high-level PIN to access root settings.", textAlign: TextAlign.center),
+            const SizedBox(height: 40),
+            TextField(decoration: InputDecoration(hintText: "Enter Admin PIN", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: sunsetOrange),
+                onPressed: () {},
+                child: const Text("VERIFY & PROCEED", style: TextStyle(color: Colors.white)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+*/
+// --- ROOM INVENTORY ---
 class RoomInventoryPage extends StatelessWidget {
   const RoomInventoryPage({super.key});
 
   void _showRoomSheet(BuildContext context, int roomNum, bool occupied) {
-    // Mock Data for Green Rooms
-    final List<String> residents = occupied ? ["Aryan Verma", "Rahul Singh", "Deepak Jha"] : [];
-
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(25),
+        padding: const EdgeInsets.fromLTRB(25, 20, 25, 40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Room #$roomNum Status", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Room #$roomNum", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: occupied ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(occupied ? "OCCUPIED" : "VACANT",
+                      style: TextStyle(color: occupied ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                )
+              ],
+            ),
+            const Divider(height: 30),
+            const Text("Room Features:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 10),
+            _infoTile(Icons.bed, "3 Individual Beds"),
+            _infoTile(Icons.desk, "3 Study Tables"),
+            _infoTile(Icons.door_sliding, "3 Wardrobes"),
             if (occupied) ...[
-              const Text("Current Residents:", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              ...residents.map((name) => ListTile(
-                leading: const Icon(Icons.person, color: sunsetOrange),
-                title: Text(name),
-                dense: true,
-              )),
-            ] else 
-              const Text("This room is currently VACANT and ready for allotment.", style: TextStyle(color: Colors.red)),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+              const Text("Residents:", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              _resTile("Aryan Verma", "SAH-101"),
+              _resTile("Rahul Singh", "SAH-102"),
+              _resTile("Deepak Jha", "SAH-103"),
+            ] else ...[
+              const SizedBox(height: 20),
+              const Text("Status:", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              const Text("Available for new allotments. All furniture inspected."),
+            ],
+            const SizedBox(height: 30),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -289,6 +349,18 @@ class RoomInventoryPage extends StatelessWidget {
       ),
     );
   }
+
+  Widget _infoTile(IconData icon, String label) => Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Row(children: [Icon(icon, size: 20, color: Colors.grey), const SizedBox(width: 10), Text(label)]),
+      );
+
+  Widget _resTile(String name, String id) => ListTile(
+        leading: const CircleAvatar(radius: 15, child: Icon(Icons.person, size: 15)),
+        title: Text(name),
+        subtitle: Text(id),
+        dense: true,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +388,473 @@ class RoomInventoryPage extends StatelessWidget {
   }
 }
 
-// --- 3. STUDENT DIRECTORY ---
+// --- ATTENDANCE ---
+class AttendancePage extends StatelessWidget {
+  const AttendancePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Daily Attendance"), backgroundColor: sunsetOrange),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(15),
+        itemCount: 15,
+        itemBuilder: (ctx, i) => Card(
+          child: ListTile(
+            leading: const Icon(Icons.check_circle, color: Colors.green),
+            title: Text("Student Name ${i + 1}"),
+            subtitle: Text("Verified at 08:${i + 10} AM"),
+            trailing: const Text("Present", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- STAFF MANAGEMENT ---
+class StaffManagementPage extends StatelessWidget {
+  const StaffManagementPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Staff Roster"), backgroundColor: sunsetOrange),
+      body: ListView(
+        padding: const EdgeInsets.all(15),
+        children: const [
+          StaffCard(name: "Suresh Kumar", role: "Main Security", status: "On Duty"),
+          StaffCard(name: "Mahesh Singh", role: "Janitor", status: "On Duty"),
+          StaffCard(name: "Sunita Rani", role: "Mess In-charge", status: "Off Duty"),
+          StaffCard(name: "Rahul Dev", role: "Electrician", status: "On Duty"),
+        ],
+      ),
+    );
+  }
+}
+
+class StaffCard extends StatelessWidget {
+  final String name, role, status;
+  const StaffCard({super.key, required this.name, required this.role, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.person)),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(role),
+        trailing: Text(status, style: TextStyle(color: status == "On Duty" ? Colors.green : Colors.red)),
+      ),
+    );
+  }
+}
+
+// --- OCCUPANCY, GATE, COMPLAINTS ---
+class OccupancyStatsPage extends StatelessWidget {
+  const OccupancyStatsPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text("Occupancy Analytics"), backgroundColor: sunsetOrange),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _occTile("Wing A", "120/125 Beds", 0.96, Colors.green),
+              _occTile("Wing B", "110/125 Beds", 0.88, Colors.blue),
+              _occTile("Wing C", "118/125 Beds", 0.94, Colors.orange),
+              _occTile("Wing D", "124/125 Beds", 0.99, Colors.red),
+            ],
+          ),
+        ),
+      );
+
+  Widget _occTile(String w, String d, double p, Color c) => Card(
+        child: ListTile(
+          title: Text(w, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: LinearProgressIndicator(value: p, color: c, backgroundColor: Colors.grey[200]),
+          trailing: Text(d),
+        ),
+      );
+}
+
+class GateRecordsPage extends StatelessWidget {
+  const GateRecordsPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text("Gate Security Logs"), backgroundColor: sunsetOrange),
+        body: ListView.builder(
+          itemCount: 20,
+          itemBuilder: (ctx, i) => ListTile(
+            leading: Icon(i % 2 == 0 ? Icons.logout : Icons.login, color: i % 2 == 0 ? Colors.red : Colors.green),
+            title: Text("Student SAH-${101 + i}"),
+            subtitle: Text("Time: 0${(i % 12) + 1}:00 PM | Purpose: Outing"),
+            trailing: const Text("Verified"),
+          ),
+        ),
+      );
+}
+
+class ComplaintManagementPage extends StatelessWidget {
+  const ComplaintManagementPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text("Student Complaints"), backgroundColor: sunsetOrange),
+        body: ListView(
+          padding: const EdgeInsets.all(10),
+          children: [
+            _compCard("Water Leakage", "Room 302", "Urgent", Colors.red),
+            _compCard("WiFi Down", "Wing B", "Medium", Colors.orange),
+            _compCard("Fan Repair", "Room 105", "Low", Colors.blue),
+          ],
+        ),
+      );
+
+  Widget _compCard(String t, String r, String p, Color c) => Card(
+        child: ListTile(
+          title: Text(t),
+          subtitle: Text(r),
+          trailing: Chip(label: Text(p), backgroundColor: c.withValues(alpha: 0.2)),
+        ),
+      );
+}
+
+// --- 6. UPDATED INBOX (WITH WHATSAPP FEATURES & GROUP CREATION) ---
+class WardenInboxPage extends StatefulWidget {
+  const WardenInboxPage({super.key});
+
+  @override
+  State<WardenInboxPage> createState() => _WardenInboxPageState();
+}
+
+class _WardenInboxPageState extends State<WardenInboxPage> {
+  final List<Map<String, dynamic>> chats = [
+    {"name": "Sneha Patel", "gender": "girl", "msg": "Sir, need leave for 2 days.", "isGroup": false},
+    {"name": "Rahul Sharma", "gender": "boy", "msg": "I have lost my room key.", "isGroup": false},
+  ];
+
+  void _editName(int index) {
+    TextEditingController nameCtrl = TextEditingController(text: chats[index]['name']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Name"),
+        content: TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Enter Name")),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              setState(() => chats[index]['name'] = nameCtrl.text);
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _createNewGroup() {
+    List<String> students = ["Aryan", "Rahul", "Sneha", "Priya", "Deepak"];
+    List<String> selected = [];
+    TextEditingController groupNameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Create New Group"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: groupNameCtrl, decoration: const InputDecoration(hintText: "Group Name")),
+              const SizedBox(height: 10),
+              const Text("Select Members:", style: TextStyle(fontWeight: FontWeight.bold)),
+              ...students.map((s) => CheckboxListTile(
+                    title: Text(s),
+                    value: selected.contains(s),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        val! ? selected.add(s) : selected.remove(s);
+                      });
+                    },
+                  )),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () {
+                if (groupNameCtrl.text.isNotEmpty && selected.isNotEmpty) {
+                  setState(() {
+                    chats.insert(0, {
+                      "name": groupNameCtrl.text,
+                      "gender": "group",
+                      "msg": "Group created by Warden",
+                      "isGroup": true
+                    });
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Create"),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: sunsetOrange,
+        onPressed: _createNewGroup,
+        child: const Icon(Icons.group_add, color: Colors.white),
+      ),
+      body: ListView.builder(
+        itemCount: chats.length,
+        itemBuilder: (ctx, i) => ListTile(
+          leading: CircleAvatar(
+            backgroundColor: chats[i]['gender'] == 'girl'
+                ? Colors.pink[100]
+                : chats[i]['gender'] == 'boy'
+                    ? Colors.blue[100]
+                    : Colors.orange[100],
+            child: Icon(
+              chats[i]['isGroup'] ? Icons.groups : Icons.person,
+              color: chats[i]['gender'] == 'girl'
+                  ? Colors.pink
+                  : chats[i]['gender'] == 'boy'
+                      ? Colors.blue
+                      : Colors.orange,
+            ),
+          ),
+          title: Text(chats[i]['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(chats[i]['msg']!, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("12:00 PM", style: TextStyle(fontSize: 10, color: Colors.grey)),
+              IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => _editName(i)),
+            ],
+          ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => ChatDetailPage(
+                      name: chats[i]['name']!,
+                      gender: chats[i]['gender']!,
+                      isGroup: chats[i]['isGroup'],
+                    )),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- 7. UPDATED CHAT DETAIL (WHATSAPP UI: Status Ticks & Alignment) ---
+class ChatDetailPage extends StatefulWidget {
+  final String name, gender;
+  final bool isGroup;
+  const ChatDetailPage({super.key, required this.name, required this.gender, this.isGroup = false});
+  @override
+  State<ChatDetailPage> createState() => _ChatDetailPageState();
+}
+
+class _ChatDetailPageState extends State<ChatDetailPage> {
+  final List<Map<String, dynamic>> _msgs = [
+    {"text": "Hello Warden, how are you?", "isWarden": false, "status": "read", "time": "10:00 AM"},
+  ];
+  final _ctrl = TextEditingController();
+
+  void _sendMessage() {
+    if (_ctrl.text.trim().isNotEmpty) {
+      setState(() {
+        _msgs.add({
+          "text": _ctrl.text,
+          "isWarden": true,
+          "status": "sent", // Options: sent, delivered, read
+          "time": "${DateTime.now().hour}:${DateTime.now().minute}"
+        });
+        _ctrl.clear();
+      });
+
+      // Simulate delivery after 1 second
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) setState(() => _msgs.last['status'] = "delivered");
+      });
+      // Simulate read after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _msgs.last['status'] = "read");
+      });
+    }
+  }
+
+  Widget _getStatusIcon(String status) {
+    if (status == "sent") return const Icon(Icons.check, size: 14, color: Colors.grey);
+    if (status == "delivered") return const Icon(Icons.done_all, size: 14, color: Colors.grey);
+    if (status == "read") return const Icon(Icons.done_all, size: 14, color: Colors.blue);
+    return const SizedBox();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Color themeColor = widget.gender == 'girl' ? Colors.pink : (widget.gender == 'boy' ? Colors.blue : Colors.orange);
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: themeColor,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              child: Icon(widget.isGroup ? Icons.groups : Icons.person, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.name, style: const TextStyle(fontSize: 16, color: Colors.white)),
+                  Text(widget.isGroup ? "tap for group info" : "online", style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: NetworkImage("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"),
+            fit: BoxFit.cover,
+            opacity: 0.05,
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                itemCount: _msgs.length,
+                itemBuilder: (ctx, i) {
+                  bool isWarden = _msgs[i]['isWarden'];
+                  return Align(
+                    alignment: isWarden ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isWarden ? const Color(0xFFE7FFDB) : Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(12),
+                          topRight: const Radius.circular(12),
+                          bottomLeft: isWarden ? const Radius.circular(12) : Radius.zero,
+                          bottomRight: isWarden ? Radius.zero : const Radius.circular(12),
+                        ),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                      ),
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12, right: 10),
+                            child: Text(_msgs[i]['text'], style: const TextStyle(fontSize: 15, color: textDark)),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Row(
+                              children: [
+                                Text(_msgs[i]['time'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                const SizedBox(width: 4),
+                                if (isWarden) _getStatusIcon(_msgs[i]['status']),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            _buildMessageInput(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      color: Colors.transparent,
+      child: Row(
+        children: [
+          Expanded(
+            child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+              child: Row(
+                children: [
+                  const SizedBox(width: 10),
+                  const Icon(Icons.emoji_emotions_outlined, color: Colors.grey),
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      decoration: const InputDecoration(
+                        hintText: "Message",
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.attach_file, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.camera_alt, color: Colors.grey),
+                  const SizedBox(width: 15),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          CircleAvatar(
+            backgroundColor: sunsetOrange,
+            radius: 25,
+            child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- REMAINING PAGES ---
+class WardenProfilePage extends StatelessWidget {
+  const WardenProfilePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Warden Profile"), backgroundColor: sunsetOrange),
+      body: const Center(
+        child: Column(
+          children: [
+            SizedBox(height: 40),
+            CircleAvatar(radius: 50, child: Icon(Icons.person, size: 50)),
+            SizedBox(height: 20),
+            Text("Chief Warden", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text("sahyog.warden@example.com"),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class StudentDirectoryPage extends StatelessWidget {
   const StudentDirectoryPage({super.key});
   @override
@@ -324,97 +862,30 @@ class StudentDirectoryPage extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(10),
       itemCount: 10,
-      itemBuilder: (ctx, i) => Card(
+      itemBuilder: (ctx, i) => const Card(
         child: ListTile(
-          leading: const CircleAvatar(backgroundColor: warmYellow, child: Icon(Icons.person, color: Colors.white)),
-          title: Text("Student Name #$i"),
-          subtitle: Text("ID: SAH-202$i | Room: ${101 + i}"),
-          trailing: const Icon(Icons.chevron_right),
+          leading: CircleAvatar(backgroundColor: warmYellow, child: Icon(Icons.person, color: Colors.white)),
+          title: Text("Student Name"),
+          subtitle: Text("ID: SAH-2026 | Room: 105"),
         ),
       ),
     );
   }
 }
 
-// --- 4. INBOX & CHAT ---
-class WardenInboxPage extends StatelessWidget {
-  const WardenInboxPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 5,
-      itemBuilder: (ctx, i) => ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.mail)),
-        title: Text("Student Group ${i+1}"),
-        subtitle: const Text("Permission request for late entry..."),
-        onTap: () {},
-      ),
-    );
-  }
-}
-
-// --- 5. SETTINGS / ADMIN SETUP ---
 class AdminSetupPage extends StatelessWidget {
   const AdminSetupPage({super.key});
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return ListView(
       children: [
         const ListTile(leading: Icon(Icons.person), title: Text("Profile Settings")),
         const ListTile(leading: Icon(Icons.security), title: Text("Security & Privacy")),
-        const ListTile(leading: Icon(Icons.help), title: Text("Support Center")),
         ListTile(
-          leading: const Icon(Icons.logout, color: Colors.red),
-          title: const Text("Logout"),
-          onTap: () => Navigator.pop(context),
-        ),
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text("Logout"),
+            onTap: () => Navigator.pop(context)),
       ],
     );
   }
-}
-
-// --- 6. PLACEHOLDER FUNCTIONAL PAGES ---
-class OccupancyStatsPage extends StatelessWidget {
-  const OccupancyStatsPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Occupancy Stats"), backgroundColor: sunsetOrange),
-    body: const Center(child: Text("Total Beds: 500\nOccupied: 470\nAvailable: 30", textAlign: TextAlign.center, style: TextStyle(fontSize: 20))),
-  );
-}
-
-class AttendancePage extends StatelessWidget {
-  const AttendancePage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Attendance Log"), backgroundColor: sunsetOrange),
-    body: const Center(child: Text("No records for today yet.")),
-  );
-}
-
-class GateRecordsPage extends StatelessWidget {
-  const GateRecordsPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Gate Logs"), backgroundColor: sunsetOrange),
-    body: const Center(child: Text("Recent Entry: Student SAH-09 (6:30 PM)")),
-  );
-}
-
-class StaffManagementPage extends StatelessWidget {
-  const StaffManagementPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Staff Roster"), backgroundColor: sunsetOrange),
-    body: const Center(child: Text("On Duty: 12 Members")),
-  );
-}
-
-class ComplaintManagementPage extends StatelessWidget {
-  const ComplaintManagementPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Complaint Center"), backgroundColor: sunsetOrange),
-    body: const Center(child: Text("3 Pending Complaints")),
-  );
 }

@@ -4,44 +4,59 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.10.0 <4.0.0"
+ sdk: ">=3.8.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+
   cupertino_icons: ^1.0.6
-  
-  # Camera and ML Kit for BioAuth
+
+  # Networking
+  dio: ^5.4.0
+  retrofit: ^4.1.0
+  json_annotation: ^4.11.0
+  logger: ^2.0.2
+  shared_preferences: ^2.2.2
+
+  # Camera and ML Kit
   camera: ^0.11.0
-  google_mlkit_face_detection: ^0.11.0
-  
+  google_mlkit_face_detection: ^0.13.2
+
   # UI and Animations
-  animate_do: ^3.3.4
+  animate_do: ^4.2.0
   animated_text_kit: ^4.2.2
-  
+
   # Utilities
   path_provider: ^2.1.1
   path: ^1.8.3
-  intl: ^0.19.0
+  intl: ^0.20.2
   image_picker: ^1.0.7
-  url_launcher: ^6.1.10
-  shared_preferences: ^2.2.2
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0 # Standard for SDK 3.x
-  flutter_launcher_icons: ^0.13.1
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+  # Builders
+  build_runner: ^2.4.8
+  # Downgraded to 7.0.8 to avoid the "mapperCode" compilation error
+  retrofit_generator: ^10.2.3 
+  json_serializable: ^6.7.1
 
 flutter:
   uses-material-design: true
+
   assets:
     - assets/images/logo.png
     - assets/images/g_logo.png
     - assets/images/b_logo.png
 
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
   image_path: "assets/images/logo.png"
   adaptive_icon_background: "#ffffff"
