@@ -4,7 +4,7 @@ import 'package:my_app/data/models/login_response.dart';
 
 part 'rest_api_client.g.dart';
 
-@RestApi(baseUrl: "https://your-base-url.com/api")
+@RestApi(baseUrl: "https://devsahyog.myakola.com/api")
 abstract class RestAPIClient {
   factory RestAPIClient(Dio dio, {String? baseUrl}) = _RestAPIClient;
 

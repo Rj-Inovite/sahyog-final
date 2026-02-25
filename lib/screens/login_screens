@@ -4,7 +4,7 @@ import 'boy.dart';
 import 'girl.dart';
 import 'parent.dart';
 import 'warden.dart';
-//import 'mark.dart';
+import 'admin.dart'; // Ensure your admin.dart file has a class named AdminDashboard
 
 class LoginPage extends StatefulWidget {
   final Function(String) onRoleChange;
@@ -35,11 +35,12 @@ class _LoginPageState extends State<LoginPage> {
         return const Color.fromRGBO(185, 38, 87, 1);
       case 'Boy':
         return const Color(0xFF1A237E);
-      
       case 'Parent':
         return const Color(0xFF2E7D32);
       case 'Warden':
         return const Color.fromARGB(255, 235, 143, 5);
+      case 'Biometric Admin':
+        return const Color.fromARGB(255, 11, 159, 218); // Deep Charcoal for Admin
       default:
         return const Color.fromRGBO(185, 38, 87, 1);
     }
@@ -47,15 +48,16 @@ class _LoginPageState extends State<LoginPage> {
 
   String _getRoleImageUrl() {
     switch (selectedRole) {
-       case 'Girl':
+      case 'Girl':
         return 'https://static.vecteezy.com/system/resources/previews/070/115/235/non_2x/flat-style-woman-profile-avatar-with-brown-hair-and-red-shirt-illustration-vector.jpg';
-   
       case 'Boy':
         return 'https://cdn-icons-png.flaticon.com/512/4128/4128196.png';
-         case 'Parent':
+      case 'Parent':
         return 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTr7WZ2nUyWtAo_3Ao-zIIyDxK9jK3s6lnR5A&s';
       case 'Warden':
         return 'https://media.istockphoto.com/id/627770474/vector/contact-face-female-girl-lady-woman-icon.jpg?s=170667a&w=0&k=20&c=1LrBuROYO0wpoghFcWUm8ViFsyMiF3ZNV7zbJLFrZ1Q=';
+      case 'Biometric Admin':
+        return 'https://static.tildacdn.com/tild3732-6431-4664-b037-386230346464/what-is-FR.jpg'; // Fingerprint/Tech icon
       default:
         return '';
     }
@@ -65,7 +67,7 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("You have been logged in successfully!"),
+          content: Text("$selectedRole logged in successfully!"),
           backgroundColor: Colors.green[600],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -80,13 +82,15 @@ class _LoginPageState extends State<LoginPage> {
       Widget target;
       if (selectedRole == 'Girl') {
         target = GirlDashboard(userData: data);
-      }
-       else if (selectedRole == 'Boy') {
+      } else if (selectedRole == 'Boy') {
         target = BoyDashboard(userData: data);
-       } else if (selectedRole == 'Parent') {
+      } else if (selectedRole == 'Parent') {
         target = ParentPortal(userData: data);
-      } else {
+      } else if (selectedRole == 'Warden') {
         target = WardenDashboard(userData: data);
+      } else {
+        // Redirection to admin.dart
+        target = AdminDashboard(userData: data); 
       }
 
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -117,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Form(
             key: _formKey,
             child: Column(
@@ -198,11 +202,12 @@ class _LoginPageState extends State<LoginPage> {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
           color: Colors.grey[200], borderRadius: BorderRadius.circular(15)),
-      child: Row(
-        children: ['Girl','Boy', 'Parent', 'Warden'].map((role) {
-          bool isSelected = selectedRole == role;
-          return Expanded(
-            child: GestureDetector(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal, // Added to handle 5 items comfortably
+        child: Row(
+          children: ['Girl', 'Boy', 'Parent', 'Warden', 'Biometric Admin'].map((role) {
+            bool isSelected = selectedRole == role;
+            return GestureDetector(
               onTap: () {
                 setState(() {
                   selectedRole = role;
@@ -211,7 +216,8 @@ class _LoginPageState extends State<LoginPage> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                 decoration: BoxDecoration(
                   color: isSelected ? _roleColor : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
@@ -220,14 +226,14 @@ class _LoginPageState extends State<LoginPage> {
                   role,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? Colors.white : Colors.black54),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -245,8 +251,11 @@ class _LoginPageState extends State<LoginPage> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         onPressed: _handleLogin,
-        child: const Text("LOGIN TO DASHBOARD",
-            style: TextStyle(
+        child: Text(
+            selectedRole == 'Biometric Admin' 
+                ? "ADMIN ACCESS" 
+                : "LOGIN TO DASHBOARD",
+            style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
       ),
     );
