@@ -12,7 +12,7 @@ part of 'rest_api_client.dart';
 
 class _RestAPIClient implements RestAPIClient {
   _RestAPIClient(this._dio, {this.baseUrl, this.errorLogger}) {
-    baseUrl ??= 'https://devsahyog.myakola.com/api';
+    baseUrl ??= 'https://devsahyog.myakola.com/api/';
   }
 
   final Dio _dio;
@@ -67,6 +67,38 @@ class _RestAPIClient implements RestAPIClient {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     await _dio.fetch<void>(_options);
+  }
+
+  @override
+  Future<PasswordUpdateResponse> updatePassword(
+    String token,
+    PasswordUpdateRequest request,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{r'Authorization': token};
+    _headers.removeWhere((k, v) => v == null);
+    final _data = <String, dynamic>{};
+    _data.addAll(request.toJson());
+    final _options = _setStreamType<PasswordUpdateResponse>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'update-password',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late PasswordUpdateResponse _value;
+    try {
+      _value = PasswordUpdateResponse.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
   }
 
   RequestOptions _setStreamType<T>(RequestOptions requestOptions) {

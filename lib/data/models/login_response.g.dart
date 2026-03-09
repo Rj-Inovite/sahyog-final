@@ -26,7 +26,7 @@ Map<String, dynamic> _$LoginResponseToJson(LoginResponse instance) =>
 
 User _$UserFromJson(Map<String, dynamic> json) => User(
   id: (json['id'] as num).toInt(),
-  userId: json['user_id'] as String?,
+  userId: json['user_id'] as String,
   firstName: json['first_name'] as String,
   lastName: json['last_name'] as String?,
   profile: json['profile'] as String?,
@@ -40,7 +40,7 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
   address: json['address'] as String?,
   deletedAt: json['deleted_at'] as String?,
   createdAt: json['created_at'] as String,
-  updatedAt: json['updated_at'] as String?,
+  updatedAt: json['updated_at'] as String,
   roles: (json['roles'] as List<dynamic>)
       .map((e) => Role.fromJson(e as Map<String, dynamic>))
       .toList(),

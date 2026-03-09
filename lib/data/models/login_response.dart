@@ -29,16 +29,16 @@ class User {
   final int id;
 
   @JsonKey(name: 'user_id')
-  final String? userId;
+  final String userId;
 
   @JsonKey(name: 'first_name')
   final String firstName;
 
+  // ✅ FIXED: Marked as nullable because logs show this as null for some users
   @JsonKey(name: 'last_name')
-  final String? lastName; // ✅ nullable
+  final String? lastName;
 
-  final String? profile; // ✅ nullable
-
+  final String? profile;
   final String mobile;
   final String email;
 
@@ -46,7 +46,7 @@ class User {
   final int hostelId;
 
   @JsonKey(name: 'admission_date')
-  final String? admissionDate; // ✅ nullable
+  final String? admissionDate;
 
   final String status;
 
@@ -54,26 +54,26 @@ class User {
   final String userType;
 
   @JsonKey(name: 'app_user_type')
-  final String? appUserType; // ✅ nullable
+  final String? appUserType;
 
-  final String? address; // ✅ nullable
+  final String? address;
 
   @JsonKey(name: 'deleted_at')
-  final String? deletedAt; // ✅ nullable
+  final String? deletedAt;
 
   @JsonKey(name: 'created_at')
   final String createdAt;
 
   @JsonKey(name: 'updated_at')
-  final String? updatedAt;
+  final String updatedAt;
 
   final List<Role> roles;
 
   User({
     required this.id,
-     this.userId,
+    required this.userId,
     required this.firstName,
-    this.lastName,
+    this.lastName, // ✅ Now optional
     this.profile,
     required this.mobile,
     required this.email,
@@ -85,7 +85,7 @@ class User {
     this.address,
     this.deletedAt,
     required this.createdAt,
-     this.updatedAt,
+    required this.updatedAt,
     required this.roles,
   });
 

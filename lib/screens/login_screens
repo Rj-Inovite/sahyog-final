@@ -67,7 +67,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   String _getRoleImageUrl() {
     switch (selectedRole) {
       case 'Girl': 
-        return 'https://media.istockphoto.com/id/617590498/vector/girl-icon-cartoon-single-avatar-people-icon.jpg';
+        return 'https://cdn-icons-png.flaticon.com/512/6997/6997662.png';
       case 'Boy': 
         return 'https://cdn-icons-png.flaticon.com/512/1999/1999625.png';
       case 'Parent': 
@@ -75,7 +75,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       case 'Warden': 
         return 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
       default: 
-        return 'https://cdn-icons-png.flaticon.com/512/847/847969.png';
+        return 'https://media.istockphoto.com/id/1166057711/vector/biometric-person-identification-facial-recognition-concept-futuristic-low-polygonal-human.jpg?s=612x612&w=0&k=20&c=bEePF402x94i0sHzgQ9kc8TSGb3jSs4DbeqIusyiIPM=';
     }
   }
 
