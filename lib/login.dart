@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 
-// Updated Dashboard imports
-import 'student.dart'; // Import your new student dashboard
+// Dashboard imports
+import 'student.dart'; 
 import 'parent.dart';
 import 'warden.dart';
 import 'admin.dart';
@@ -21,13 +21,10 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final ApiService _apiService = ApiService();
-
-  // Updated Roles List
-  final List<String> roles = ['Student', 'Parent', 'Warden', 'Biometric Admin'];
-
+  
   // State Variables
-  String selectedRole = 'Student'; // Defaulted to Student
+  final List<String> roles = ['Student', 'Parent', 'Warden', 'Biometric Admin'];
+  String selectedRole = 'Student'; 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
@@ -53,31 +50,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  // ================= THEME & IMAGE MAPPING =================
-
-  Color _getThemeColor() {
-    switch (selectedRole) {
-      case 'Student': return const Color.fromARGB(255, 115, 41, 212); // Deep Blue
-      case 'Parent': return const Color.fromRGBO(28, 128, 33, 1);  // Green
-      case 'Warden': return const Color(0xFFEB8F05);  // Orange
-      default: return const Color(0xFF0B9FDA);        // Light Blue for Admin
-    }
-  }
+  // ================= THEME CONFIGURATION =================
+  // Using the Universal Modern Theme (Indigo/Slate)
+  final Color primaryIndigo = const Color(0xFF4F46E5);
+  final Color secondaryTeal = const Color(0xFF14B8A6);
+  final Color backgroundWhite = Colors.white;
 
   String _getRoleImageUrl() {
     switch (selectedRole) {
-      case 'Student': 
-        return 'https://cdn-icons-png.flaticon.com/512/3549/3549155.png';
-      case 'Parent': 
-        return 'https://cdn-icons-png.flaticon.com/512/8955/8955352.png';
-      case 'Warden': 
-        return 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
-      default: 
-        return 'https://cdn-icons-png.flaticon.com/512/9131/9131529.png';
+      case 'Student': return 'https://cdn-icons-png.flaticon.com/512/3549/3549155.png';
+      case 'Parent': return 'https://cdn-icons-png.flaticon.com/512/8955/8955352.png';
+      case 'Warden': return 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+      default: return 'https://cdn-icons-png.flaticon.com/512/9131/9131529.png';
     }
   }
 
-  // ================= LOGIN FUNCTION =================
+  // ================= LOGIN LOGIC =================
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -85,47 +73,44 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _isLoading = true);
 
     try {
-      final response = await _apiService.client.login({
+      // Calling your API Service
+      final response = await apiService.client.login({
         "login": _identifierController.text.trim(),
         "password": _passwordController.text.trim(),
       });
 
+      // 1. Extract Data from Response
       String serverRole = response.role; 
       String authToken = response.token;
+      String userId = response.user.id.toString(); // Extracting the User ID
       String firstName = response.user.firstName;
 
+      // 2. IMPORTANT: Save to SharedPreferences for the Interceptor
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("token", authToken);
+      await prefs.setString("auth_token", authToken); // Matches Interceptor
+      await prefs.setString("user_id", userId);       // Matches Interceptor
       await prefs.setString("role", serverRole);
+      await prefs.setString("user_name", firstName);
 
       Map<String, String> userData = {
         "identifier": _identifierController.text.trim(),
         "role": serverRole,
         "name": firstName,
+        "id": userId,
       };
 
       if (!mounted) return;
+      _showFeedback("Welcome back, $firstName!", secondaryTeal);
 
-      _showFeedback("Welcome, $firstName!", Colors.green);
-
-      // ================= UPDATED REDIRECT LOGIC =================
-      
+      // 3. Navigation Logic
       Widget targetScreen;
-
-      // 1. Check if Warden
-      if (selectedRole == "Warden" || serverRole == "Warden") {
+      if (serverRole.toLowerCase() == "warden") {
         targetScreen = WardenDashboard(userData: userData);
-      } 
-      // 2. Check if Student (Maps to API "Hosteller")
-      else if (selectedRole == "Student" || serverRole == "Hosteller") {
+      } else if (serverRole.toLowerCase() == "hosteller" || selectedRole == "Student") {
         targetScreen = StudentDashboard(userData: userData);
-      } 
-      // 3. Check if Parent
-      else if (selectedRole == "Parent" || serverRole == "Parent") {
+      } else if (serverRole.toLowerCase() == "parent") {
         targetScreen = ParentPortal(userData: userData);
-      } 
-      // 4. Default to Admin
-      else {
+      } else {
         targetScreen = AdminDashboard(userData: userData);
       }
 
@@ -136,7 +121,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     } catch (e) {
       debugPrint("LOGIN ERROR: $e");
-      _showFeedback("Login failed. Check credentials.", Colors.redAccent);
+      _showFeedback("Invalid credentials. Please try again.", Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -145,174 +130,206 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   void _showFeedback(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  // ================= UI COMPONENTS =================
+  // ================= UI BUILDER =================
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = _getThemeColor();
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("SAHYOG LOGIN", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        centerTitle: true,
-        backgroundColor: themeColor,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 30),
-            
-            // --- DYNAMIC PROFILE IMAGE ---
-            Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                padding: const EdgeInsets.all(5),
+      backgroundColor: backgroundWhite,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // --- HEADER ---
+              Text(
+                "SAHYOG",
+                style: TextStyle(
+  fontSize: 28,
+  fontWeight: FontWeight.w900, // ✅ Use w900 for the "Black" weight
+  color: primaryIndigo,
+),
+              ),
+              const Text("Management Portal", style: TextStyle(color: Colors.grey)),
+              
+              const SizedBox(height: 40),
+              
+              // --- DYNAMIC AVATAR ---
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: themeColor.withOpacity(0.5), width: 4),
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryIndigo.withOpacity(0.15),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    )
+                  ],
                 ),
                 child: CircleAvatar(
-                  radius: 65,
-                  backgroundColor: Colors.grey[200],
+                  radius: 60,
+                  backgroundColor: Colors.grey[100],
                   backgroundImage: NetworkImage(_getRoleImageUrl()),
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 30),
+              
+              const SizedBox(height: 35),
 
-            // --- ROLE SELECTOR ---
-            _buildRolePills(themeColor),
+              // --- ROLE SELECTOR ---
+              _buildRoleSelector(),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
-              child: Form(
+              const SizedBox(height: 30),
+
+              // --- LOGIN FORM ---
+              Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildTextField(
+                    _buildInputField(
                       controller: _identifierController,
-                      label: "Email / Username",
-                      icon: Icons.person_outline,
-                      color: themeColor,
+                      label: "Email or Username",
+                      icon: Icons.alternate_email_rounded,
                     ),
-                    const SizedBox(height: 15),
-                    _buildTextField(
+                    const SizedBox(height: 18),
+                    _buildInputField(
                       controller: _passwordController,
                       label: "Password",
-                      icon: Icons.lock_outline,
-                      color: themeColor,
+                      icon: Icons.lock_open_rounded,
                       isPassword: true,
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: Text("Forgot Password?", style: TextStyle(color: primaryIndigo)),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
 
-                    _buildShinyButton(themeColor),
+                    _buildActionButton(),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildRolePills(Color themeColor) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: Row(
-        children: roles.map((role) {
-          bool isSelected = selectedRole == role;
+  Widget _buildRoleSelector() {
+    return Container(
+      height: 45,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: roles.length,
+        itemBuilder: (context, index) {
+          bool isSelected = selectedRole == roles[index];
           return GestureDetector(
             onTap: () {
-              setState(() => selectedRole = role);
-              widget.onRoleChange(role);
+              setState(() => selectedRole = roles[index]);
+              widget.onRoleChange(roles[index]);
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? themeColor : Colors.grey[100],
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: isSelected 
-                  ? [BoxShadow(color: themeColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]
-                  : [],
+                color: isSelected ? primaryIndigo : Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? primaryIndigo : Colors.grey[200]!,
+                ),
               ),
               child: Text(
-                role,
+                roles[index],
                 style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[600],
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : Colors.black54,
                 ),
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildInputField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    required Color color,
     bool isPassword = false,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isPassword ? !_isPasswordVisible : false,
+      style: const TextStyle(fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: color),
+        labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+        prefixIcon: Icon(icon, color: primaryIndigo, size: 20),
         suffixIcon: isPassword
             ? IconButton(
-                icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                icon: Icon(_isPasswordVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 20),
                 onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
               )
             : null,
         filled: true,
         fillColor: Colors.grey[50],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.grey[200]!),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: color, width: 2),
+          borderSide: BorderSide(color: primaryIndigo, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent),
         ),
       ),
-      validator: (value) => (value == null || value.isEmpty) ? "Field required" : null,
+      validator: (value) => (value == null || value.isEmpty) ? "Required" : null,
     );
   }
 
-  Widget _buildShinyButton(Color themeColor) {
+  Widget _buildActionButton() {
     return AnimatedBuilder(
       animation: _shinyController,
       builder: (context, child) {
         return Container(
           width: double.infinity,
-          height: 60,
+          height: 55,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: primaryIndigo.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              )
+            ],
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              stops: [
-                _shinyController.value - 0.4,
-                _shinyController.value,
-                _shinyController.value + 0.4,
-              ],
-              colors: [themeColor, Colors.white.withOpacity(0.5), themeColor],
+              colors: [primaryIndigo, const Color(0xFF6366F1)],
             ),
           ),
           child: ElevatedButton(
@@ -323,8 +340,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             ),
             onPressed: _isLoading ? null : _handleLogin,
             child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text("LOG IN", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    "LOGIN TO ACCOUNT",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
           ),
         );
       },

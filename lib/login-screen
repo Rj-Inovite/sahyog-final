@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 
-// Dashboard imports
-import 'boy.dart';
-import 'girl.dart';
+// Updated Dashboard imports
+import 'student.dart'; // Import your new student dashboard
 import 'parent.dart';
 import 'warden.dart';
 import 'admin.dart';
@@ -24,15 +23,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
 
+  // Updated Roles List
+  final List<String> roles = ['Student', 'Parent', 'Warden', 'Biometric Admin'];
+
   // State Variables
-  String selectedRole = 'Girl';
+  String selectedRole = 'Student'; // Defaulted to Student
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // Animation controller for the "Shiny" button sweep effect
   late AnimationController _shinyController;
 
   @override
@@ -56,26 +57,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Color _getThemeColor() {
     switch (selectedRole) {
-      case 'Girl': return const Color(0xFFB92657);
-      case 'Boy': return const Color(0xFF1A237E);
-      case 'Parent': return const Color(0xFF2E7D32);
-      case 'Warden': return const Color(0xFFEB8F05);
-      default: return const Color(0xFF0B9FDA); 
+      case 'Student': return const Color.fromARGB(255, 115, 41, 212); // Deep Blue
+      case 'Parent': return const Color.fromRGBO(28, 128, 33, 1);  // Green
+      case 'Warden': return const Color(0xFFEB8F05);  // Orange
+      default: return const Color(0xFF0B9FDA);        // Light Blue for Admin
     }
   }
 
   String _getRoleImageUrl() {
     switch (selectedRole) {
-      case 'Girl': 
-        return 'https://cdn-icons-png.flaticon.com/512/6997/6997662.png';
-      case 'Boy': 
-        return 'https://cdn-icons-png.flaticon.com/512/1999/1999625.png';
+      case 'Student': 
+        return 'https://cdn-icons-png.flaticon.com/512/3549/3549155.png';
       case 'Parent': 
         return 'https://cdn-icons-png.flaticon.com/512/8955/8955352.png';
       case 'Warden': 
         return 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
       default: 
-        return 'https://media.istockphoto.com/id/1166057711/vector/biometric-person-identification-facial-recognition-concept-futuristic-low-polygonal-human.jpg?s=612x612&w=0&k=20&c=bEePF402x94i0sHzgQ9kc8TSGb3jSs4DbeqIusyiIPM=';
+        return 'https://cdn-icons-png.flaticon.com/512/9131/9131529.png';
     }
   }
 
@@ -92,12 +90,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         "password": _passwordController.text.trim(),
       });
 
-      // Data extraction from API response
       String serverRole = response.role; 
       String authToken = response.token;
       String firstName = response.user.firstName;
 
-      // Persist session
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString("token", authToken);
       await prefs.setString("role", serverRole);
@@ -112,25 +108,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       _showFeedback("Welcome, $firstName!", Colors.green);
 
-      // ================= FIXED REDIRECT LOGIC =================
+      // ================= UPDATED REDIRECT LOGIC =================
       
       Widget targetScreen;
 
-      // Priority 1: If user chose 'Warden' in the UI OR API returns 'Warden'
+      // 1. Check if Warden
       if (selectedRole == "Warden" || serverRole == "Warden") {
         targetScreen = WardenDashboard(userData: userData);
       } 
-      // Priority 2: Handle Hostellers
-      else if (serverRole == "Hosteller") {
-        targetScreen = selectedRole == 'Girl'
-            ? GirlDashboard(userData: userData)
-            : BoyDashboard(userData: userData);
+      // 2. Check if Student (Maps to API "Hosteller")
+      else if (selectedRole == "Student" || serverRole == "Hosteller") {
+        targetScreen = StudentDashboard(userData: userData);
       } 
-      // Priority 3: Parent
-      else if (serverRole == "Parent" || selectedRole == "Parent") {
+      // 3. Check if Parent
+      else if (selectedRole == "Parent" || serverRole == "Parent") {
         targetScreen = ParentPortal(userData: userData);
       } 
-      // Priority 4: Admin / Biometric Admin
+      // 4. Default to Admin
       else {
         targetScreen = AdminDashboard(userData: userData);
       }
@@ -222,7 +216,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                     const SizedBox(height: 40),
 
-                    // --- SHINY ACTION BUTTON ---
                     _buildShinyButton(themeColor),
                   ],
                 ),
@@ -235,7 +228,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   Widget _buildRolePills(Color themeColor) {
-    final roles = ['Girl', 'Boy', 'Parent', 'Warden', 'Biometric Admin'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -282,14 +274,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return TextFormField(
       controller: controller,
       obscureText: isPassword ? !_isPasswordVisible : false,
-      style: const TextStyle(fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: color.withOpacity(0.8)),
         prefixIcon: Icon(icon, color: color),
         suffixIcon: isPassword
             ? IconButton(
-                icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: Colors.grey),
+                icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
                 onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
               )
             : null,
@@ -322,19 +312,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 _shinyController.value,
                 _shinyController.value + 0.4,
               ],
-              colors: [
-                themeColor,
-                Colors.white.withOpacity(0.5),
-                themeColor,
-              ],
+              colors: [themeColor, Colors.white.withOpacity(0.5), themeColor],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: themeColor.withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              )
-            ],
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -344,11 +323,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             ),
             onPressed: _isLoading ? null : _handleLogin,
             child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
-                : const Text(
-                    "LOG IN",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
-                  ),
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text("LOG IN", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
         );
       },
