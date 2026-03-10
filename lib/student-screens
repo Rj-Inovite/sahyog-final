@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:my_app/student-profile.dart';
+//import 'package:my_app/student_profile.dart';
 import 'login.dart';
 // Updated to match your requirement
 import 'student_profile.dart'; 
@@ -182,11 +182,11 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
     return Row(
       children: [
         Expanded(
-          child: _buildInfoSquare("Room No", widget.userData['room'] ?? "102", Icons.door_sliding, Colors.orange),
+          child: _buildInfoSquare("Room No", widget.userData['room'] ?? "102", Icons.door_sliding, const Color.fromRGBO(233, 166, 65, 1)),
         ),
         const SizedBox(width: 15),
         Expanded(
-          child: _buildInfoSquare("Status", "In-Campus", Icons.location_on, Colors.green),
+          child: _buildInfoSquare("Status", "In-Campus", Icons.location_on, const Color.fromRGBO(6, 153, 80, 1)),
         ),
       ],
     );
@@ -223,10 +223,10 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
       childAspectRatio: 1.1,
       children: [
         _actionCard(context, "Leave Request", Icons.time_to_leave_rounded, const Color(0xFF6366F1), const LeavePage()),
-        _actionCard(context, "Support Desk", Icons.support_agent_rounded, const Color(0xFF10B981), const ServiceDeskPage()),
-        _actionCard(context, "Meal Schedule", Icons.fastfood_rounded, const Color(0xFFF59E0B), const MessMenuPage()),
-        _actionCard(context, "Fee Portal", Icons.account_balance_wallet_rounded, const Color(0xFFEC4899), const PaymentsPage()),
-        _actionCard(context, "Complaint", Icons.report_problem_rounded, const Color(0xFFEF4444), const RaiseComplaintPage()),
+        _actionCard(context, "Support Desk", Icons.support_agent_rounded, const Color.fromRGBO(16, 75, 185, 1), const ServiceDeskPage()),
+        _actionCard(context, "Meal Schedule", Icons.fastfood_rounded, const Color.fromRGBO(110, 28, 241, 1), const MessMenuPage()),
+        _actionCard(context, "Fee Portal", Icons.account_balance_wallet_rounded, const Color.fromRGBO(16, 226, 233, 1), const PaymentsPage()),
+        _actionCard(context, "Complaint", Icons.report_problem_rounded, const Color.fromARGB(255, 4, 55, 102), const RaiseComplaintPage()),
       ],
     );
   }

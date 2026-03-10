@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-//import 'package:my_app/student_profile.dart';
 import 'login.dart';
-// Updated to match your requirement
 import 'student_profile.dart'; 
+// Ensure this filename matches exactly what you saved
+import 'warden_chat_screen.dart'; 
 
 // --- DATA LAYER ---
 class ChatData {
@@ -116,7 +116,7 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
         ),
       ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]
         ),
         child: BottomNavigationBar(
@@ -128,7 +128,17 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
           onTap: (index) {
             if (index == 0) setState(() => _currentIndex = 0);
             if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (context) => const AttendancePage()));
-            if (index == 2) Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatPage()));
+            
+            // --- UPDATED INBOX NAVIGATION ---
+            if (index == 2) {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (context) => WardenChatScreen(userData: widget.userData)
+                )
+              );
+            }
+            
             if (index == 3) Navigator.push(context, MaterialPageRoute(builder: (context) => SettingsPage(email: widget.userData['email'] ?? "")));
           },
           items: const [
@@ -278,6 +288,11 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
         trailing: CircleAvatar(
           backgroundColor: Colors.green.shade50,
           child: const Icon(Icons.phone, color: Colors.green, size: 20),
+        ),
+        // Navigate to chat when the card is clicked
+        onTap: () => Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => WardenChatScreen(userData: widget.userData))
         ),
       ),
     );
@@ -609,80 +624,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 }
 
-// --- 7. INBOX/CHAT ---
-class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
-  @override
-  State<ChatPage> createState() => _ChatPageState();
-}
-
-class _ChatPageState extends State<ChatPage> {
-  final TextEditingController _messageController = TextEditingController();
-  final Color primaryColor = const Color(0xFF1A237E);
-
-  void _sendMessage({String? text, bool isImage = false}) {
-    if (text == null && _messageController.text.trim().isEmpty) return;
-    setState(() {
-      ChatData.messages.add({
-        "text": text ?? _messageController.text,
-        "isMe": true,
-        "time": DateFormat('hh:mm a').format(DateTime.now()),
-        "status": "sent",
-        "isImage": isImage,
-      });
-      _messageController.clear();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Support Chat"), backgroundColor: primaryColor, foregroundColor: Colors.white),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: ChatData.messages.length,
-              itemBuilder: (context, index) {
-                final msg = ChatData.messages[index];
-                bool isMe = msg['isMe'] ?? false;
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isMe ? primaryColor : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Text(msg['text'], style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
-                  ),
-                );
-              },
-            ),
-          ),
-          _buildMessageInput(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Padding(
-      padding: const EdgeInsets.all(10.0),
-      child: Row(
-        children: [
-          Expanded(child: TextField(controller: _messageController, decoration: InputDecoration(hintText: "Message...", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none)))),
-          const SizedBox(width: 8),
-          CircleAvatar(backgroundColor: primaryColor, child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: () => _sendMessage())),
-        ],
-      ),
-    );
-  }
-}
-
-// --- 8. SETTINGS ---
+// --- 7. SETTINGS ---
 class SettingsPage extends StatelessWidget {
   final String email;
   const SettingsPage({super.key, required this.email});
@@ -701,7 +643,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- 9. NOTICE PAGE ---
+// --- 8. NOTICE PAGE ---
 class NoticePage extends StatelessWidget {
   const NoticePage({super.key});
   @override

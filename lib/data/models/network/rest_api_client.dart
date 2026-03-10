@@ -36,16 +36,24 @@ abstract class RestAPIClient {
   // ================= CHAT APIS =================
 
   /// 5. Add Conversation (Chat Setup)
-  /// Creates the room: pass {"name": "Room Name", "type": "group/private"}
+  /// Creates the room: pass {"name": "Room Name", "type": "group", "user_id": "ID"}
   @POST("/chat/setup")
   Future<ConversationResponse> setupConversation(
     @Body() Map<String, dynamic> body,
   );
 
-  /// 6. Warden Chat API
-  /// Sends actual messages to a specific conversation ID
-  @POST("/chat/warden")
+  /// 6. Send Message (FIXED ENDPOINT)
+  /// Updated from /chat/warden to /chat/send to resolve 404 error
+  /// Body expects: {"conversation_id": int, "type": "text", "content": "message text"}
+  @POST("/chat/send")
   Future<dynamic> sendWardenMessage(
     @Body() Map<String, dynamic> body,
+  );
+
+  /// 7. Fetch Chat Messages
+  /// Retrieves history for a specific conversation ID
+  @GET("/chat/messages/{conversation_id}")
+  Future<dynamic> getChatHistory(
+    @Path("conversation_id") int conversationId,
   );
 }
