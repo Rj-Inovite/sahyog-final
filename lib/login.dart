@@ -1,339 +1,357 @@
-// ignore_for_file: unused_import
+// ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 
 // Dashboard imports
-import 'boy.dart';
-import 'girl.dart';
+import 'student.dart'; 
 import 'parent.dart';
 import 'warden.dart';
 import 'admin.dart';
 
 class LoginPage extends StatefulWidget {
   final Function(String) onRoleChange;
+
   const LoginPage({super.key, required this.onRoleChange});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   
-  // API Service instance (kept for general use)
-  final ApiService _apiService = ApiService();
-
-  // Screen State variables
-  String selectedRole = 'Girl';
+  // State Variables
+  final List<String> roles = ['Student', 'Parent', 'Warden', 'Biometric Admin'];
+  String selectedRole = 'Student'; 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
-  // Input Controllers
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  late AnimationController _shinyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shinyController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _shinyController.dispose();
     super.dispose();
   }
 
-  // ================= 1. DYNAMIC IMAGE LOGIC =================
-  String getRoleImageUrl() {
-    if (selectedRole == 'Girl') {
-      return 'https://media.istockphoto.com/id/617590498/vector/girl-icon-cartoon-single-avatar-people-icon.jpg?s=612x612&w=0&k=20&c=jvZMLSb6iQwv3v7m2FHo4TsdW_m7TE-raytwiW4OEks=';
-    } else if (selectedRole == 'Boy') {
-      return 'https://cdn-icons-png.flaticon.com/512/1999/1999625.png';
-    } else if (selectedRole == 'Parent') {
-      return 'https://cdn-icons-png.flaticon.com/512/8955/8955352.png';
-    } else if (selectedRole == 'Warden') {
-      return 'https://cdn.pixabay.com/photo/2024/02/14/05/34/girl-8572395_640.png';
-    } else if (selectedRole == 'Biometric Admin') {
-      return 'https://www.shutterstock.com/image-vector/face-recognition-icon-biometrical-sign-260nw-2594701351.jpg';
-    } else {
-      return 'https://images.unsplash.com/photo-1503467913725-8487b65262ad?q=80&w=400&auto=format&fit=crop';
+  // ================= THEME CONFIGURATION =================
+  // Using the Universal Modern Theme (Indigo/Slate)
+  final Color primaryIndigo = const Color(0xFF4F46E5);
+  final Color secondaryTeal = const Color(0xFF14B8A6);
+  final Color backgroundWhite = Colors.white;
+
+  String _getRoleImageUrl() {
+    switch (selectedRole) {
+      case 'Student': return 'https://cdn-icons-png.flaticon.com/512/3549/3549155.png';
+      case 'Parent': return 'https://cdn-icons-png.flaticon.com/512/8955/8955352.png';
+      case 'Warden': return 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+      default: return 'https://cdn-icons-png.flaticon.com/512/9131/9131529.png';
     }
   }
 
-  // ================= 2. DYNAMIC COLOR LOGIC =================
-  Color getSelectedRoleColor() {
-    if (selectedRole == 'Girl') {
-      return const Color.fromRGBO(185, 38, 87, 1);
-    } else if (selectedRole == 'Boy') {
-      return const Color(0xFF1A237E);
-    } else if (selectedRole == 'Parent') {
-      return const Color(0xFF2E7D32);
-    } else if (selectedRole == 'Warden') {
-      return const Color.fromARGB(255, 235, 143, 5);
-    } else if (selectedRole == 'Biometric Admin') {
-      return const Color.fromARGB(255, 11, 159, 218);
-    } else {
-      return const Color.fromRGBO(185, 38, 87, 1);
-    }
-  }
+  // ================= LOGIN LOGIC =================
 
-  // ================= 3. LOGIN EXECUTION =================
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate() == false) return;
+    if (!_formKey.currentState!.validate()) return;
 
-    final String email = _identifierController.text.trim();
-    final String password = _passwordController.text.trim();
+    setState(() => _isLoading = true);
 
-    setState(() {
-      _isLoading = true;
-    });
+    try {
+      // Calling your API Service
+      final response = await apiService.client.login({
+        "login": _identifierController.text.trim(),
+        "password": _passwordController.text.trim(),
+      });
 
-    // --- LOGIC UPDATED FOR admin@gmail.com and Success2026$ ---
-    if (email == "admin@gmail.com" && password == "Success2026\$") {
-      
-      // 1. Success Message
-      _showFeedback("You have been logged in", Colors.green);
+      // 1. Extract Data from Response
+      String serverRole = response.role; 
+      String authToken = response.token;
+      String userId = response.user.id.toString(); // Extracting the User ID
+      String firstName = response.user.firstName;
 
-      // 2. Local Session Storage
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString("token", "local_auth_token_2026");
-      await prefs.setString("role", selectedRole);
+      // 2. IMPORTANT: Save to SharedPreferences for the Interceptor
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("auth_token", authToken); // Matches Interceptor
+      await prefs.setString("user_id", userId);       // Matches Interceptor
+      await prefs.setString("role", serverRole);
+      await prefs.setString("user_name", firstName);
 
       Map<String, String> userData = {
-        "identifier": email,
-        "role": selectedRole,
+        "identifier": _identifierController.text.trim(),
+        "role": serverRole,
+        "name": firstName,
+        "id": userId,
       };
 
-      // 3. Page Redirection based on selectedRole
+      if (!mounted) return;
+      _showFeedback("Welcome back, $firstName!", secondaryTeal);
+
+      // 3. Navigation Logic
       Widget targetScreen;
-      if (selectedRole == 'Girl') {
-        targetScreen = GirlDashboard(userData: userData);
-      } else if (selectedRole == 'Boy') {
-        targetScreen = BoyDashboard(userData: userData);
-      } else if (selectedRole == 'Parent') {
-        targetScreen = ParentPortal(userData: userData);
-      } else if (selectedRole == 'Warden') {
+      if (serverRole.toLowerCase() == "warden") {
         targetScreen = WardenDashboard(userData: userData);
+      } else if (serverRole.toLowerCase() == "hosteller" || selectedRole == "Student") {
+        targetScreen = StudentDashboard(userData: userData);
+      } else if (serverRole.toLowerCase() == "parent") {
+        targetScreen = ParentPortal(userData: userData);
       } else {
         targetScreen = AdminDashboard(userData: userData);
       }
 
-      if (!mounted) return;
-
-      // 4. Navigate to the dashboard
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => targetScreen),
+        MaterialPageRoute(builder: (_) => targetScreen),
       );
-      
-    } else {
-      // Wrong Credentials
-      _showFeedback("Wrong credentials. Access denied.", Colors.redAccent);
-      setState(() {
-        _isLoading = false;
-      });
+
+    } catch (e) {
+      debugPrint("LOGIN ERROR: $e");
+      _showFeedback("Invalid credentials. Please try again.", Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showFeedback(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  // ================= 4. MAIN BUILD METHOD =================
+  // ================= UI BUILDER =================
+
   @override
   Widget build(BuildContext context) {
-    final Color currentColor = getSelectedRoleColor();
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          "SAHYOG LOGIN",
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5),
-        ),
-        centerTitle: true,
-        backgroundColor: currentColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [currentColor.withOpacity(0.1), Colors.white],
-          ),
-        ),
+      backgroundColor: backgroundWhite,
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 25),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                const SizedBox(height: 30),
-                _buildHeaderImage(currentColor),
-                const SizedBox(height: 30),
-                _buildRoleSelector(currentColor),
-                const SizedBox(height: 40),
-                
-                _buildInputField(
-                  controller: _identifierController,
-                  hintText: "admin@gmail.com",
-                  iconData: Icons.alternate_email_rounded,
-                  themeColor: currentColor,
-                ),
-                
-                _buildInputField(
-                  controller: _passwordController,
-                  hintText: "Success2026\$",
-                  iconData: Icons.lock_open_rounded,
-                  themeColor: currentColor,
-                  isPasswordField: true,
-                  obscureText: !_isPasswordVisible,
-                  onSuffixIconTap: () {
-                    setState(() {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    });
-                  },
-                ),
-                
-                const SizedBox(height: 30),
-                _buildSubmitButton(currentColor),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= 5. UI COMPONENTS =================
-  Widget _buildHeaderImage(Color themeColor) {
-    return Container(
-      width: 150, height: 150,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: themeColor, width: 3),
-        boxShadow: [
-          BoxShadow(color: themeColor.withOpacity(0.2), blurRadius: 20, spreadRadius: 5)
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(100),
-        child: Image.network(
-          getRoleImageUrl(),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: 80, color: themeColor),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoleSelector(Color themeColor) {
-    final List<String> roleOptions = ['Girl', 'Boy', 'Parent', 'Warden', 'Biometric Admin'];
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: roleOptions.map((role) {
-            final bool isSelected = (selectedRole == role);
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedRole = role;
-                });
-                widget.onRoleChange(role);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // --- HEADER ---
+              Text(
+                "SAHYOG",
+                style: TextStyle(
+  fontSize: 28,
+  fontWeight: FontWeight.w900, // ✅ Use w900 for the "Black" weight
+  color: primaryIndigo,
+),
+              ),
+              const Text("Management Portal", style: TextStyle(color: Colors.grey)),
+              
+              const SizedBox(height: 40),
+              
+              // --- DYNAMIC AVATAR ---
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? themeColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryIndigo.withOpacity(0.15),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    )
+                  ],
                 ),
-                child: Text(
-                  role,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black54,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.grey[100],
+                  backgroundImage: NetworkImage(_getRoleImageUrl()),
                 ),
               ),
-            );
-          }).toList(),
+              
+              const SizedBox(height: 35),
+
+              // --- ROLE SELECTOR ---
+              _buildRoleSelector(),
+
+              const SizedBox(height: 30),
+
+              // --- LOGIN FORM ---
+              Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildInputField(
+                      controller: _identifierController,
+                      label: "Email or Username",
+                      icon: Icons.alternate_email_rounded,
+                    ),
+                    const SizedBox(height: 18),
+                    _buildInputField(
+                      controller: _passwordController,
+                      label: "Password",
+                      icon: Icons.lock_open_rounded,
+                      isPassword: true,
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: Text("Forgot Password?", style: TextStyle(color: primaryIndigo)),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    _buildActionButton(),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoleSelector() {
+    return Container(
+      height: 45,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: roles.length,
+        itemBuilder: (context, index) {
+          bool isSelected = selectedRole == roles[index];
+          return GestureDetector(
+            onTap: () {
+              setState(() => selectedRole = roles[index]);
+              widget.onRoleChange(roles[index]);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected ? primaryIndigo : Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? primaryIndigo : Colors.grey[200]!,
+                ),
+              ),
+              child: Text(
+                roles[index],
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildInputField({
     required TextEditingController controller,
-    required String hintText,
-    required IconData iconData,
-    required Color themeColor,
-    bool isPasswordField = false,
-    bool obscureText = false,
-    VoidCallback? onSuffixIconTap,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Colors.white,
-          hintText: hintText,
-          prefixIcon: Icon(iconData, color: themeColor),
-          suffixIcon: isPasswordField 
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword ? !_isPasswordVisible : false,
+      style: const TextStyle(fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+        prefixIcon: Icon(icon, color: primaryIndigo, size: 20),
+        suffixIcon: isPassword
             ? IconButton(
-                icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
-                onPressed: onSuffixIconTap,
-              ) 
+                icon: Icon(_isPasswordVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 20),
+                onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+              )
             : null,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide(color: themeColor, width: 2),
-          ),
+        filled: true,
+        fillColor: Colors.grey[50],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.grey[200]!),
         ),
-        validator: (value) => (value == null || value.isEmpty) ? "Cannot be empty" : null,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: primaryIndigo, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
       ),
+      validator: (value) => (value == null || value.isEmpty) ? "Required" : null,
     );
   }
 
-  Widget _buildSubmitButton(Color themeColor) {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleLogin,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: themeColor,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          elevation: 5,
-        ),
-        child: _isLoading 
-          ? const CircularProgressIndicator(color: Colors.white)
-          : const Text("ACCESS ACCOUNT", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
+  Widget _buildActionButton() {
+    return AnimatedBuilder(
+      animation: _shinyController,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          height: 55,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: primaryIndigo.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              )
+            ],
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryIndigo, const Color(0xFF6366F1)],
+            ),
+          ),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            onPressed: _isLoading ? null : _handleLogin,
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    "LOGIN TO ACCOUNT",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+          ),
+        );
+      },
     );
   }
 }

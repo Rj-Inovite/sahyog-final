@@ -34,8 +34,9 @@ class User {
   @JsonKey(name: 'first_name')
   final String firstName;
 
+  // ✅ FIXED: Marked as nullable because logs show this as null for some users
   @JsonKey(name: 'last_name')
-  final String lastName;
+  final String? lastName;
 
   final String? profile;
   final String mobile;
@@ -72,7 +73,7 @@ class User {
     required this.id,
     required this.userId,
     required this.firstName,
-    required this.lastName,
+    this.lastName, // ✅ Now optional
     this.profile,
     required this.mobile,
     required this.email,

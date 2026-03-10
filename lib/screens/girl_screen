@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'login.dart';
-// IMPORTANT: Ensure this file exists in your project
+// Ensure this file exists in your project
 import 'girl_profile.dart'; 
 
 // --- DATA LAYER ---
@@ -26,6 +26,13 @@ class ChatData {
   ];
 
   static String lastComplaintDate = "";
+  
+  // Declared Holidays for the calendar
+  static List<DateTime> declaredHolidays = [
+    DateTime(2026, 3, 14), // Example: Holi
+    DateTime(2026, 3, 30), // Example: Break
+    DateTime(2026, 4, 10), // Example: Good Friday
+  ];
 }
 
 // --- DASHBOARD ---
@@ -38,8 +45,8 @@ class GirlDashboard extends StatefulWidget {
 }
 
 class _GirlDashboardState extends State<GirlDashboard> {
-  final Color bgPink = const Color(0xFFFFF1F2); // Very light soft pink
-  final Color primaryPink = const Color(0xFFD81B60); // Deep Rose/Pink
+  final Color bgPink = const Color(0xFFFFF1F2); 
+  final Color primaryPink = const Color(0xFFD81B60); 
   final Color accentPink = const Color(0xFFF06292);
   int _currentIndex = 0;
 
@@ -204,7 +211,7 @@ class _GirlDashboardState extends State<GirlDashboard> {
   }
 }
 
-// --- 1. APPLY LEAVE ---
+// --- 1. APPLY LEAVE (UPDATED FEATURE) ---
 class LeavePage extends StatefulWidget {
   const LeavePage({super.key});
   @override
@@ -212,9 +219,40 @@ class LeavePage extends StatefulWidget {
 }
 
 class _LeavePageState extends State<LeavePage> {
-  DateTime selectedDate = DateTime.now();
-  final TextEditingController _daysController = TextEditingController();
   final Color primaryPink = const Color(0xFFD81B60);
+  final TextEditingController _reasonController = TextEditingController();
+  
+  bool isSingleDay = true;
+  DateTime selectedDate = DateTime.now();
+  DateTimeRange? selectedRange;
+
+  void _submitApplication() {
+    String reason = _reasonController.text.trim();
+    if (reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please provide a reason for leave.")),
+      );
+      return;
+    }
+
+    String dateInfo = isSingleDay 
+        ? DateFormat('dd MMM yyyy').format(selectedDate)
+        : "${DateFormat('dd MMM').format(selectedRange!.start)} to ${DateFormat('dd MMM yyyy').format(selectedRange!.end)}";
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Success"),
+        content: Text("Applied leave for $dateInfo.\nReason: $reason"),
+        actions: [
+          TextButton(
+            onPressed: () { Navigator.pop(ctx); Navigator.pop(context); },
+            child: Text("OK", style: TextStyle(color: primaryPink)),
+          )
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -224,48 +262,113 @@ class _LeavePageState extends State<LeavePage> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Theme(
-              data: Theme.of(context).copyWith(colorScheme: ColorScheme.light(primary: primaryPink)),
-              child: CalendarDatePicker(
-                initialDate: selectedDate,
-                firstDate: DateTime.now(),
-                lastDate: DateTime(2027),
-                onDateChanged: (date) => setState(() => selectedDate = date),
-              ),
+            const Text("Select Leave Type:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Radio(
+                  value: true, 
+                  groupValue: isSingleDay, 
+                  activeColor: primaryPink,
+                  onChanged: (val) => setState(() => isSingleDay = val as bool),
+                ),
+                const Text("Single Day"),
+                const SizedBox(width: 20),
+                Radio(
+                  value: false, 
+                  groupValue: isSingleDay, 
+                  activeColor: primaryPink,
+                  onChanged: (val) => setState(() => isSingleDay = val as bool),
+                ),
+                const Text("Multiple Days"),
+              ],
             ),
             const Divider(),
-            const Text("Enter Leave Duration (Days)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            
+            if (isSingleDay) ...[
+              const Text("Select Date", style: TextStyle(fontWeight: FontWeight.bold)),
+              Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: ColorScheme.light(primary: primaryPink),
+                ),
+                child: CalendarDatePicker(
+                  initialDate: selectedDate,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2027),
+                  onDateChanged: (date) => setState(() => selectedDate = date),
+                  selectableDayPredicate: (day) {
+                    // Logic for highlighting Holidays in logic (not natively colored in this widget)
+                    return true; 
+                  },
+                ),
+              ),
+            ] else ...[
+              const Text("Select Date Range", style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: primaryPink),
+                onPressed: () async {
+                  final DateTimeRange? range = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2027),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: ColorScheme.light(
+                            primary: primaryPink,
+                            onPrimary: Colors.white,
+                            surface: Colors.white,
+                            onSurface: Colors.black,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (range != null) setState(() => selectedRange = range);
+                },
+                icon: const Icon(Icons.date_range),
+                label: Text(selectedRange == null ? "Pick From & To Dates" : "Range Selected"),
+              ),
+              if (selectedRange != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text("From: ${DateFormat('dd/MM/yyyy').format(selectedRange!.start)} To: ${DateFormat('dd/MM/yyyy').format(selectedRange!.end)}", 
+                  style: TextStyle(color: primaryPink, fontWeight: FontWeight.bold)),
+                ),
+            ],
+
+            const SizedBox(height: 20),
+            const Text("Reason for Leave", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             TextField(
-              controller: _daysController,
-              keyboardType: TextInputType.number,
+              controller: _reasonController,
+              maxLines: 3,
               decoration: InputDecoration(
-                hintText: "e.g. 3",
+                hintText: "Enter reason...",
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                prefixIcon: Icon(Icons.date_range, color: primaryPink),
               ),
             ),
+            
+            const SizedBox(height: 15),
+            const Text("Declared Holidays ", style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+            Wrap(
+              children: ChatData.declaredHolidays.map((h) => Chip(
+                label: Text(DateFormat('dd MMM').format(h), style: const TextStyle(fontSize: 10, color: Colors.white)),
+                backgroundColor: Colors.green,
+              )).toList(),
+            ),
+
             const SizedBox(height: 30),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: primaryPink, minimumSize: const Size(double.infinity, 50)),
-              onPressed: () {
-                if (_daysController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter number of days")));
-                  return;
-                }
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text("Success"),
-                    content: Text("Applied leave on ${DateFormat('dd MMM yyyy').format(selectedDate)} for ${_daysController.text} days."),
-                    actions: [TextButton(onPressed: () { Navigator.pop(ctx); Navigator.pop(context); }, child: Text("OK", style: TextStyle(color: primaryPink)))],
-                  ),
-                );
-              },
-              child: const Text("SUBMIT APPLICATION", style: TextStyle(color: Colors.white, fontSize: 16)),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryPink, minimumSize: const Size(double.infinity, 55)),
+              onPressed: _submitApplication,
+              child: const Text("SUBMIT APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -289,9 +392,7 @@ class _RaiseComplaintPageState extends State<RaiseComplaintPage> {
 
   void _submitComplaint() {
     if (!_mediaAttached) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error: Proof/File upload is mandatory to send complaint.")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: Proof/File upload is mandatory to send complaint.")));
       return;
     }
     String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -444,24 +545,21 @@ class MessMenuPage extends StatelessWidget {
       backgroundColor: const Color(0xFFFFF1F2),
       appBar: AppBar(title: const Text("Girl's Mess Menu"), backgroundColor: const Color(0xFFD81B60), foregroundColor: Colors.white),
       body: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(10),
-          child: DataTable(
-            headingRowColor: MaterialStateProperty.all(Colors.pink.shade50),
-            columns: const [
-              DataColumn(label: Text('Day', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Breakfast', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Lunch', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Dinner', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: menuData.map((m) => DataRow(cells: [
-              DataCell(Text(m['day']!, style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataCell(Text(m['b']!)),
-              DataCell(Text(m['l']!)),
-              DataCell(Text(m['d']!)),
-            ])).toList(),
-          ),
+        padding: const EdgeInsets.all(10),
+        child: DataTable(
+          headingRowColor: MaterialStateProperty.all(Colors.pink.shade50),
+          columns: const [
+            DataColumn(label: Text('Day', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Breakfast', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Lunch', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Dinner', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+          rows: menuData.map((m) => DataRow(cells: [
+            DataCell(Text(m['day']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+            DataCell(Text(m['b']!, style: const TextStyle(fontSize: 12))),
+            DataCell(Text(m['l']!, style: const TextStyle(fontSize: 12))),
+            DataCell(Text(m['d']!, style: const TextStyle(fontSize: 12))),
+          ])).toList(),
         ),
       ),
     );
@@ -473,7 +571,7 @@ class PaymentsPage extends StatelessWidget {
   const PaymentsPage({super.key});
   @override
   Widget build(BuildContext context) {
-    final Color primaryPink = const Color(0xFFD81B60);
+    const Color primaryPink = Color(0xFFD81B60);
     return Scaffold(
       backgroundColor: const Color(0xFFFFF1F2),
       appBar: AppBar(title: const Text("Payments"), backgroundColor: primaryPink, foregroundColor: Colors.white),
@@ -514,43 +612,19 @@ class AttendancePage extends StatefulWidget {
 }
 
 class _AttendancePageState extends State<AttendancePage> {
-  String filter = "Month";
   final Color primaryPink = const Color(0xFFD81B60);
-
-  void _showAttendanceMsg(BuildContext context, bool isPresent) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(
-          isPresent ? "In: 8:15 AM\nOut: 7:00 PM" : "In: Missing\nOut: Missing",
-          style: TextStyle(color: isPresent ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF1F2),
-      appBar: AppBar(
-        title: const Text("Attendance"),
-        backgroundColor: primaryPink,
-        foregroundColor: Colors.white,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_alt),
-            onSelected: (val) => setState(() => filter = val),
-            itemBuilder: (context) => ["Year", "Month", "Week"].map((s) => PopupMenuItem(value: s, child: Text(s))).toList(),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text("Attendance"), backgroundColor: primaryPink, foregroundColor: Colors.white),
       body: SingleChildScrollView(
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(15),
-              child: Text("Viewing: $filter", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryPink)),
+              child: Text("Monthly Log", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryPink)),
             ),
             SizedBox(
               height: 300,
@@ -560,18 +634,15 @@ class _AttendancePageState extends State<AttendancePage> {
                 itemCount: 28,
                 itemBuilder: (context, i) {
                   bool present = i % 5 != 0;
-                  return GestureDetector(
-                    onTap: () => _showAttendanceMsg(context, present),
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("${i + 1}"),
-                          Icon(Icons.circle, size: 8, color: present ? Colors.green : Colors.pink),
-                        ],
-                      ),
+                  return Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text("${i + 1}"),
+                        Icon(Icons.circle, size: 8, color: present ? Colors.green : Colors.pink),
+                      ],
                     ),
                   );
                 },
@@ -627,10 +698,6 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _shareFile() {
-    _sendMessage(text: "Shared an image file", isImage: true);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -656,10 +723,8 @@ class _ChatPageState extends State<ChatPage> {
                         decoration: BoxDecoration(
                           color: isMe ? primaryPink : Colors.grey[200],
                           borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(15),
-                            topRight: const Radius.circular(15),
-                            bottomLeft: Radius.circular(isMe ? 15 : 0),
-                            bottomRight: Radius.circular(isMe ? 0 : 15),
+                            topLeft: const Radius.circular(15), topRight: const Radius.circular(15),
+                            bottomLeft: Radius.circular(isMe ? 15 : 0), bottomRight: Radius.circular(isMe ? 0 : 15),
                           ),
                         ),
                         child: msg['isImage'] == true
@@ -669,17 +734,7 @@ class _ChatPageState extends State<ChatPage> {
                               ])
                             : Text(msg['text'], style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(msg['time'] ?? "", style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                          if (isMe) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.done_all, size: 12, color: msg['status'] == "read" ? Colors.blue : Colors.grey),
-                          ]
-                        ],
-                      ),
-                      const SizedBox(height: 8),
+                      Text(msg['time'] ?? "", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 );
@@ -698,23 +753,9 @@ class _ChatPageState extends State<ChatPage> {
       color: Colors.white,
       child: Row(
         children: [
-          IconButton(icon: Icon(Icons.add_a_photo, color: primaryPink), onPressed: _shareFile),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: "Type a message...",
-                filled: true,
-                fillColor: Colors.pink.shade50,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: primaryPink,
-            child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: () => _sendMessage()),
-          ),
+          IconButton(icon: Icon(Icons.add_a_photo, color: primaryPink), onPressed: () => _sendMessage(text: "Shared file", isImage: true)),
+          Expanded(child: TextField(controller: _messageController, decoration: InputDecoration(hintText: "Type...", filled: true, fillColor: Colors.pink.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none)))),
+          CircleAvatar(backgroundColor: primaryPink, child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: () => _sendMessage())),
         ],
       ),
     );
@@ -730,10 +771,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool notifOn = true;
-  double brightness = 0.5;
   final Color primaryPink = const Color(0xFFD81B60);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -742,13 +780,9 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
-          SwitchListTile(secondary: Icon(Icons.notifications, color: primaryPink), title: const Text("Notifications"), value: notifOn, activeColor: primaryPink, onChanged: (v) => setState(() => notifOn = v)),
-          const Divider(),
-          const ListTile(leading: Icon(Icons.palette), title: Text("Theme Mode (Pink/Soft)")),
-          Slider(value: brightness, activeColor: primaryPink, onChanged: (v) => setState(() => brightness = v)),
-          const Divider(),
-          ListTile(leading: Icon(Icons.lock_reset, color: primaryPink), title: const Text("Change Password"), onTap: () {}),
-          ListTile(leading: Icon(Icons.help_center, color: primaryPink), title: const Text("Help & Support"), onTap: () {}),
+          ListTile(leading: Icon(Icons.notifications, color: primaryPink), title: const Text("Notifications")),
+          ListTile(leading: Icon(Icons.lock_reset, color: primaryPink), title: const Text("Change Password")),
+          ListTile(leading: Icon(Icons.help_center, color: primaryPink), title: const Text("Help & Support")),
         ],
       ),
     );
@@ -766,8 +800,8 @@ class NoticePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
-          Card(child: ListTile(leading: Icon(Icons.security, color: Colors.pink), title: Text("Hostel Entry Time", style: TextStyle(fontWeight: FontWeight.bold)), subtitle: Text("Warden: For security reasons, all residents must enter the hostel by 8:30 PM."))),
-          Card(child: ListTile(leading: Icon(Icons.celebration, color: Colors.pink), title: Text("Cultural Fest", style: TextStyle(fontWeight: FontWeight.bold)), subtitle: Text("Meeting for upcoming Fest registration tomorrow at 5 PM in common room."))),
+          Card(child: ListTile(leading: Icon(Icons.security, color: Colors.pink), title: Text("Hostel Entry Time", style: TextStyle(fontWeight: FontWeight.bold)), subtitle: Text("Must enter by 8:30 PM."))),
+          Card(child: ListTile(leading: Icon(Icons.celebration, color: Colors.pink), title: Text("Festival", style: TextStyle(fontWeight: FontWeight.bold)), subtitle: Text("Celebration in common room at 5 PM."))),
         ],
       ),
     );
