@@ -4,18 +4,24 @@ part 'login_response.g.dart';
 
 @JsonSerializable()
 class LoginResponse {
-  final bool success;
-  final String message;
-  final String token;
-  final User user;
-  final String role;
+  final bool? success;
+  final String? message;
+
+  // ✅ Made nullable for safety, backend may return empty string
+  final String? token;
+
+  // ✅ Made nullable for safety
+  final User? user;
+
+  // ✅ Made nullable for safety
+  final String? role;
 
   LoginResponse({
-    required this.success,
-    required this.message,
-    required this.token,
-    required this.user,
-    required this.role,
+    this.success,
+    this.message,
+    this.token,
+    this.user,
+    this.role,
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) =>
@@ -26,32 +32,31 @@ class LoginResponse {
 
 @JsonSerializable()
 class User {
-  final int id;
+  final int? id;
 
   @JsonKey(name: 'user_id')
-  final String userId;
+  final String? userId;
 
   @JsonKey(name: 'first_name')
-  final String firstName;
+  final String? firstName;
 
-  // ✅ FIXED: Marked as nullable because logs show this as null for some users
   @JsonKey(name: 'last_name')
   final String? lastName;
 
   final String? profile;
-  final String mobile;
-  final String email;
+  final String? mobile;
+  final String? email;
 
   @JsonKey(name: 'hostel_id')
-  final int hostelId;
+  final int? hostelId;
 
   @JsonKey(name: 'admission_date')
   final String? admissionDate;
 
-  final String status;
+  final String? status;
 
   @JsonKey(name: 'user_type')
-  final String userType;
+  final String? userType;
 
   @JsonKey(name: 'app_user_type')
   final String? appUserType;
@@ -62,31 +67,31 @@ class User {
   final String? deletedAt;
 
   @JsonKey(name: 'created_at')
-  final String createdAt;
+  final String? createdAt;
 
   @JsonKey(name: 'updated_at')
-  final String updatedAt;
+  final String? updatedAt;
 
-  final List<Role> roles;
+  final List<Role>? roles;
 
   User({
-    required this.id,
-    required this.userId,
-    required this.firstName,
-    this.lastName, // ✅ Now optional
+    this.id,
+    this.userId,
+    this.firstName,
+    this.lastName,
     this.profile,
-    required this.mobile,
-    required this.email,
-    required this.hostelId,
+    this.mobile,
+    this.email,
+    this.hostelId,
     this.admissionDate,
-    required this.status,
-    required this.userType,
+    this.status,
+    this.userType,
     this.appUserType,
     this.address,
     this.deletedAt,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.roles,
+    this.createdAt,
+    this.updatedAt,
+    this.roles,
   });
 
   factory User.fromJson(Map<String, dynamic> json) =>
@@ -97,27 +102,27 @@ class User {
 
 @JsonSerializable()
 class Role {
-  final int id;
-  final String name;
+  final int? id;
+  final String? name;
 
   @JsonKey(name: 'guard_name')
-  final String guardName;
+  final String? guardName;
 
   @JsonKey(name: 'created_at')
-  final String createdAt;
+  final String? createdAt;
 
   @JsonKey(name: 'updated_at')
-  final String updatedAt;
+  final String? updatedAt;
 
-  final Pivot pivot;
+  final Pivot? pivot;
 
   Role({
-    required this.id,
-    required this.name,
-    required this.guardName,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.pivot,
+    this.id,
+    this.name,
+    this.guardName,
+    this.createdAt,
+    this.updatedAt,
+    this.pivot,
   });
 
   factory Role.fromJson(Map<String, dynamic> json) =>
@@ -129,18 +134,18 @@ class Role {
 @JsonSerializable()
 class Pivot {
   @JsonKey(name: 'model_type')
-  final String modelType;
+  final String? modelType;
 
   @JsonKey(name: 'model_id')
-  final int modelId;
+  final int? modelId;
 
   @JsonKey(name: 'role_id')
-  final int roleId;
+  final int? roleId;
 
   Pivot({
-    required this.modelType,
-    required this.modelId,
-    required this.roleId,
+    this.modelType,
+    this.modelId,
+    this.roleId,
   });
 
   factory Pivot.fromJson(Map<String, dynamic> json) =>

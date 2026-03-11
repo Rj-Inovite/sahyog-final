@@ -8,11 +8,13 @@ part of 'login_response.dart';
 
 LoginResponse _$LoginResponseFromJson(Map<String, dynamic> json) =>
     LoginResponse(
-      success: json['success'] as bool,
-      message: json['message'] as String,
-      token: json['token'] as String,
-      user: User.fromJson(json['user'] as Map<String, dynamic>),
-      role: json['role'] as String,
+      success: json['success'] as bool?,
+      message: json['message'] as String?,
+      token: json['token'] as String?,
+      user: json['user'] == null
+          ? null
+          : User.fromJson(json['user'] as Map<String, dynamic>),
+      role: json['role'] as String?,
     );
 
 Map<String, dynamic> _$LoginResponseToJson(LoginResponse instance) =>
@@ -25,24 +27,24 @@ Map<String, dynamic> _$LoginResponseToJson(LoginResponse instance) =>
     };
 
 User _$UserFromJson(Map<String, dynamic> json) => User(
-  id: (json['id'] as num).toInt(),
-  userId: json['user_id'] as String,
-  firstName: json['first_name'] as String,
+  id: (json['id'] as num?)?.toInt(),
+  userId: json['user_id'] as String?,
+  firstName: json['first_name'] as String?,
   lastName: json['last_name'] as String?,
   profile: json['profile'] as String?,
-  mobile: json['mobile'] as String,
-  email: json['email'] as String,
-  hostelId: (json['hostel_id'] as num).toInt(),
+  mobile: json['mobile'] as String?,
+  email: json['email'] as String?,
+  hostelId: (json['hostel_id'] as num?)?.toInt(),
   admissionDate: json['admission_date'] as String?,
-  status: json['status'] as String,
-  userType: json['user_type'] as String,
+  status: json['status'] as String?,
+  userType: json['user_type'] as String?,
   appUserType: json['app_user_type'] as String?,
   address: json['address'] as String?,
   deletedAt: json['deleted_at'] as String?,
-  createdAt: json['created_at'] as String,
-  updatedAt: json['updated_at'] as String,
-  roles: (json['roles'] as List<dynamic>)
-      .map((e) => Role.fromJson(e as Map<String, dynamic>))
+  createdAt: json['created_at'] as String?,
+  updatedAt: json['updated_at'] as String?,
+  roles: (json['roles'] as List<dynamic>?)
+      ?.map((e) => Role.fromJson(e as Map<String, dynamic>))
       .toList(),
 );
 
@@ -67,12 +69,14 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
 };
 
 Role _$RoleFromJson(Map<String, dynamic> json) => Role(
-  id: (json['id'] as num).toInt(),
-  name: json['name'] as String,
-  guardName: json['guard_name'] as String,
-  createdAt: json['created_at'] as String,
-  updatedAt: json['updated_at'] as String,
-  pivot: Pivot.fromJson(json['pivot'] as Map<String, dynamic>),
+  id: (json['id'] as num?)?.toInt(),
+  name: json['name'] as String?,
+  guardName: json['guard_name'] as String?,
+  createdAt: json['created_at'] as String?,
+  updatedAt: json['updated_at'] as String?,
+  pivot: json['pivot'] == null
+      ? null
+      : Pivot.fromJson(json['pivot'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$RoleToJson(Role instance) => <String, dynamic>{
@@ -85,9 +89,9 @@ Map<String, dynamic> _$RoleToJson(Role instance) => <String, dynamic>{
 };
 
 Pivot _$PivotFromJson(Map<String, dynamic> json) => Pivot(
-  modelType: json['model_type'] as String,
-  modelId: (json['model_id'] as num).toInt(),
-  roleId: (json['role_id'] as num).toInt(),
+  modelType: json['model_type'] as String?,
+  modelId: (json['model_id'] as num?)?.toInt(),
+  roleId: (json['role_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$PivotToJson(Pivot instance) => <String, dynamic>{

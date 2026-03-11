@@ -32,7 +32,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/auth/login',
+            'auth/login',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -59,7 +59,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/logout',
+            'logout',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -108,7 +108,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/user/profile',
+            'user/profile',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -132,7 +132,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/chat/setup',
+            'chat/setup',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -160,7 +160,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/chat/warden',
+            'chat/send',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -181,7 +181,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/chat/messages/${conversationId}',
+            'chat/messages/${conversationId}',
             queryParameters: queryParameters,
             data: _data,
           )
