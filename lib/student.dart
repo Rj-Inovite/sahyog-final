@@ -1,11 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:my_app/data/models/network/api_service.dart';
 
 // --- REQUIRED PROJECT IMPORTS ---
 import 'login.dart';
-import 'student_profile.dart'; 
-import 'warden_chat_screen.dart'; 
+import 'student_profile.dart';
+import 'warden_chat_screen.dart';
+
+// Import Leave History page (update path if needed)
+import 'leave_history_page.dart';
 
 // --- DATA & MODELS LAYER ---
 class ChatData {
@@ -27,9 +31,9 @@ class ChatData {
   ];
 
   static List<DateTime> declaredHolidays = [
-    DateTime(2026, 3, 14), 
-    DateTime(2026, 3, 30), 
-    DateTime(2026, 4, 10), 
+    DateTime(2026, 3, 14),
+    DateTime(2026, 3, 30),
+    DateTime(2026, 4, 10),
   ];
 }
 
@@ -42,10 +46,11 @@ class StudentDashboard extends StatefulWidget {
   State<StudentDashboard> createState() => _StudentDashboardState();
 }
 
-class _StudentDashboardState extends State<StudentDashboard> with SingleTickerProviderStateMixin {
+class _StudentDashboardState extends State<StudentDashboard>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   late PageController _pageController;
-  
+
   // Professional Theme Palette
   final Color primaryIndigo = const Color(0xFF3F51B5);
   final Color accentPink = const Color(0xFFE91E63);
@@ -65,11 +70,9 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
 
   void _navigateToPage(int index) {
     setState(() => _currentIndex = index);
-    _pageController.animateToPage(
-      index, 
-      duration: const Duration(milliseconds: 600), 
-      curve: Curves.easeInOutQuart
-    );
+    _pageController.animateToPage(index,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutQuart);
   }
 
   @override
@@ -82,7 +85,10 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
           setState(() => _currentIndex = index);
         },
         children: [
-          _HomeContent(userData: widget.userData, primaryIndigo: primaryIndigo, accentPink: accentPink),
+          _HomeContent(
+              userData: widget.userData,
+              primaryIndigo: primaryIndigo,
+              accentPink: accentPink),
           const AttendancePage(),
           WardenChatScreen(userData: widget.userData),
           SettingsPage(userData: widget.userData), // FIXED: Passing actual userData
@@ -100,10 +106,9 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 5)
-          )
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 5))
         ],
       ),
       child: ClipRRect(
@@ -118,9 +123,12 @@ class _StudentDashboardState extends State<StudentDashboard> with SingleTickerPr
           onTap: _navigateToPage,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: "Attendance"),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_rounded), label: "Inbox"),
-            BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: "Settings"),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_today_rounded), label: "Attendance"),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.chat_bubble_rounded), label: "Inbox"),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.settings_rounded), label: "Settings"),
           ],
         ),
       ),
@@ -134,7 +142,16 @@ class _HomeContent extends StatelessWidget {
   final Color primaryIndigo;
   final Color accentPink;
 
-  const _HomeContent({required this.userData, required this.primaryIndigo, required this.accentPink});
+  const _HomeContent(
+      {required this.userData,
+      required this.primaryIndigo,
+      required this.accentPink});
+
+  // Helper to parse user id safely
+  int _parseUserId(Map<String, String> data) {
+    final idStr = data['id'] ?? data['user_id'] ?? '';
+    return int.tryParse(idStr.toString()) ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,15 +167,21 @@ class _HomeContent extends StatelessWidget {
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: [primaryIndigo, accentPink]),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
           ),
           leading: IconButton(
             icon: const Icon(Icons.notifications_active, color: Colors.white),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
+            onPressed: () =>
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
           ),
-          title: const Text("SAHYOG PORTAL", 
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 20, color: Colors.white)),
+          title: const Text("SAHYOG PORTAL",
+              style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  fontSize: 20,
+                  color: Colors.white)),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 10),
@@ -169,9 +192,9 @@ class _HomeContent extends StatelessWidget {
                   child: Icon(Icons.person, color: Colors.white, size: 20),
                 ),
                 onPressed: () => Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => StudentProfile(userData: userData)) // FIXED: Pass real data
-                ),
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => StudentProfile(userData: userData))),
               ),
             ),
           ],
@@ -182,16 +205,16 @@ class _HomeContent extends StatelessWidget {
             delegate: SliverChildListDelegate([
               const SizedBox(height: 10),
               _buildSectionHeader("Overview"),
-              _buildIdentityCard(),
+              _buildIdentityCard(userData),
               const SizedBox(height: 20),
-              _buildResidenceInfo(),
+              _buildResidenceInfo(userData),
               const SizedBox(height: 25),
               _buildSectionHeader("Hostel Services"),
-              _buildBentoGrid(context),
+              _buildBentoGrid(context, userData),
               const SizedBox(height: 25),
               _buildSectionHeader("Primary Support"),
-              _buildWardenQuickLink(context),
-              const SizedBox(height: 100), 
+              _buildWardenQuickLink(context, userData, primaryIndigo),
+              const SizedBox(height: 100),
             ]),
           ),
         ),
@@ -202,11 +225,13 @@ class _HomeContent extends StatelessWidget {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
+      child: Text(title,
+          style: const TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
     );
   }
 
-  Widget _buildIdentityCard() {
+  Widget _buildIdentityCard(Map<String, String> userData) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -222,8 +247,10 @@ class _HomeContent extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Hi, ${userData['name'] ?? "Student"}", style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                const Text("Status: Verified Student", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                Text("Hi, ${userData['name'] ?? "Student"}",
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                const Text("Status: Verified Student",
+                    style: TextStyle(color: Colors.white70, fontSize: 14)),
               ],
             ),
           ],
@@ -232,7 +259,7 @@ class _HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildResidenceInfo() {
+  Widget _buildResidenceInfo(Map<String, String> userData) {
     return Row(
       children: [
         Expanded(child: _infoTile("ROOM", userData['room'] ?? "102", Icons.meeting_room, const Color(0xFFFF9800))),
@@ -257,7 +284,9 @@ class _HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildBentoGrid(BuildContext context) {
+  Widget _buildBentoGrid(BuildContext context, Map<String, String> userData) {
+    final int userId = _parseUserId(userData);
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -265,22 +294,34 @@ class _HomeContent extends StatelessWidget {
       crossAxisSpacing: 14,
       mainAxisSpacing: 14,
       children: [
-        _bentoItem(context, "Leave", Icons.holiday_village, const Color(0xFF6366F1), const LeavePage()),
-        _bentoItem(context, "Mess", Icons.restaurant, const Color(0xFFF59E0B), const MessMenuPage()),
-        _bentoItem(context, "Payments", Icons.account_balance_wallet, const Color(0xFFEC4899), const PaymentsPage()),
-        _bentoItem(context, "Complaints", Icons.assignment_late, const Color(0xFFEF4444), const RaiseComplaintPage()),
-        _bentoItem(context, "Support", Icons.support_agent, const Color(0xFF10B981), const ServiceDeskPage()),
-        _bentoItem(context, "Notice", Icons.campaign, const Color(0xFF8B5CF6), const NoticePage()),
+        // NAVIGATION CHANGE: tapping Leave opens LeaveHistoryPage with userId
+        _bentoItem(
+          context,
+          "Leave",
+          Icons.holiday_village,
+          const Color(0xFF6366F1),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => LeaveHistoryPage(userId: userId)),
+            );
+          },
+        ),
+        _bentoItem(context, "Mess", Icons.restaurant, const Color(0xFFF59E0B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MessMenuPage()))),
+        _bentoItem(context, "Payments", Icons.account_balance_wallet, const Color(0xFFEC4899), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage()))),
+        _bentoItem(context, "Complaints", Icons.assignment_late, const Color(0xFFEF4444), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage()))),
+        _bentoItem(context, "Support", Icons.support_agent, const Color(0xFF10B981), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServiceDeskPage()))),
+        _bentoItem(context, "Notice", Icons.campaign, const Color(0xFF8B5CF6), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticePage()))),
       ],
     );
   }
 
-  Widget _bentoItem(BuildContext context, String title, IconData icon, Color color, Widget page) {
+  Widget _bentoItem(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(25),
       child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => page)),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(25),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -294,7 +335,7 @@ class _HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildWardenQuickLink(BuildContext context) {
+  Widget _buildWardenQuickLink(BuildContext context, Map<String, String> userData, Color primaryIndigo) {
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25)),
       child: ListTile(
@@ -310,7 +351,9 @@ class _HomeContent extends StatelessWidget {
 
 // --- MODULE 1: LEAVE APPLICATION ---
 class LeavePage extends StatefulWidget {
-  const LeavePage({super.key});
+  final Map<String, String> userData;
+  const LeavePage({super.key, required this.userData});
+
   @override
   State<LeavePage> createState() => _LeavePageState();
 }
@@ -321,21 +364,89 @@ class _LeavePageState extends State<LeavePage> {
   bool isSingleDay = true;
   DateTime selectedDate = DateTime.now();
   DateTimeRange? selectedRange;
+  bool _loading = false;
 
-  void _submit() {
+  // Helper to parse user id from userData map
+  int _getUserId() {
+    final idStr = widget.userData['id'] ?? widget.userData['user_id'] ?? '';
+    return int.tryParse(idStr) ?? 0; // 0 fallback; replace with valid default if needed
+  }
+
+  Future<void> _submit() async {
     if (_reasonController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
       return;
     }
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Application Submitted"),
-        content: const Text("Your leave request is under review by the warden."),
-        actions: [TextButton(onPressed: () { Navigator.pop(ctx); Navigator.pop(context); }, child: const Text("DONE"))],
-      ),
-    );
+
+    // If multiple days selected but user didn't pick a range
+    if (!isSingleDay && selectedRange == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a date range")));
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      // Format dates for API (ISO 8601)
+      String startDate = isSingleDay
+          ? DateTime(selectedDate.year, selectedDate.month, selectedDate.day).toUtc().toIso8601String()
+          : selectedRange!.start.toUtc().toIso8601String();
+
+      String endDate = isSingleDay
+          ? DateTime(selectedDate.year, selectedDate.month, selectedDate.day).toUtc().toIso8601String()
+          : selectedRange!.end.toUtc().toIso8601String();
+
+      // Determine leave type - you can replace this logic with a dropdown if needed
+      String leaveType = isSingleDay ? "Casual" : "Medical";
+
+      final userId = _getUserId();
+      if (userId == 0) {
+        // If user id is not available, show error
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not identified. Please login again.")));
+        setState(() => _loading = false);
+        return;
+      }
+
+      // Call API (uses your global apiService instance)
+      final response = await apiService.applyLeave(
+        userId: userId,
+        leaveType: leaveType,
+        startDate: startDate,
+        endDate: endDate,
+        reason: _reasonController.text.trim(),
+      );
+
+      if (response.statusCode == 200) {
+        final msg = response.data['message'] ?? "Leave submitted!";
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text("Application Submitted"),
+            content: Text(msg),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text("DONE"),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Non-200 responses
+        final serverMsg = response.data != null && response.data['message'] != null
+            ? response.data['message']
+            : response.statusMessage ?? "Failed to submit leave";
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $serverMsg")));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $e")));
+    } finally {
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -358,16 +469,30 @@ class _LeavePageState extends State<LeavePage> {
               ),
             ),
             const SizedBox(height: 25),
-            isSingleDay 
-              ? CalendarDatePicker(initialDate: selectedDate, firstDate: DateTime.now(), lastDate: DateTime(2027), onDateChanged: (d) => setState(() => selectedDate = d))
-              : _rangePicker(),
+            isSingleDay
+                ? CalendarDatePicker(
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2027),
+                    onDateChanged: (d) => setState(() => selectedDate = d),
+                  )
+                : _rangePicker(),
             const SizedBox(height: 25),
-            TextField(controller: _reasonController, maxLines: 4, decoration: InputDecoration(hintText: "Reason for leave...", filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none))),
+            TextField(
+              controller: _reasonController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: "Reason for leave...",
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              ),
+            ),
             const SizedBox(height: 30),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-              onPressed: _submit,
-              child: const Text("SEND APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: _loading ? null : _submit,
+              child: _loading ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("SEND APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -595,8 +720,8 @@ class SettingsPage extends StatelessWidget {
           _settingTile(context, "Update Password", Icons.lock_outline, StudentProfile(userData: userData)), // FIXED
           const Divider(height: 40),
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red), 
-            title: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), 
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (ctx) => LoginPage(onRoleChange: (role) {}))),
           ),
         ],

@@ -49,7 +49,7 @@ class ApiService {
     // Attach the Interceptor so we don't have to pass tokens manually
     _dio.interceptors.add(AuthInterceptor());
 
-    // Logging for debugging (helps you see the chat JSON in console)
+    // Logging for debugging (helps you see the JSON in console)
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
       responseBody: true,
@@ -60,9 +60,6 @@ class ApiService {
   }
 
   // --- CHAT INTEGRATION METHODS ---
-
-  /// 1. Initialize Conversation (Used by Warden to start a chat)
-  /// [studentId] is the ID of the student the warden wants to message
   Future<Response> setupChat(int studentId) async {
     try {
       return await _dio.post("chat/setup", data: {
@@ -73,8 +70,6 @@ class ApiService {
     }
   }
 
-  /// 2. Send Message
-  /// [convoId] comes from the setupChat response
   Future<Response> sendMessage(int convoId, String message) async {
     try {
       return await _dio.post("chat/send", data: {
@@ -86,8 +81,6 @@ class ApiService {
     }
   }
 
-  /// 3. Fetch Messages (The "Sync" logic)
-  /// Call this on a Timer to see messages from Web dashboard
   Future<Response> getChatMessages(int convoId) async {
     try {
       return await _dio.get("chat/messages/$convoId");
@@ -95,7 +88,47 @@ class ApiService {
       rethrow;
     }
   }
+
+  // --- STUDENT LEAVE INTEGRATION METHODS ---
+  /// Apply for a leave
+  Future<Response> applyLeave({
+    required int userId,
+    required String leaveType,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  }) async {
+    try {
+      return await _dio.post("leaves/apply", data: {
+        "user_id": userId,
+        "leave_type": leaveType,
+        "start_date": startDate,
+        "end_date": endDate,
+        "reason": reason,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Fetch all leaves for a student (sync with web)
+  Future<Response> getLeaves(int userId) async {
+    try {
+      return await _dio.get("leaves/$userId");
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Optional: Cancel or update a leave if API supports it
+  Future<Response> cancelLeave(int leaveId) async {
+    try {
+      return await _dio.delete("leaves/$leaveId");
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
 
-// Global instance to use as: apiService.setupChat(id)
+// Global instance to use as: apiService.applyLeave(...)
 final apiService = ApiService();
