@@ -1,12 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
-
-// Existing Model Imports
 import 'package:my_app/data/models/login_response.dart';
-import 'package:my_app/data/models/network/password_update_model.dart';
-
-// Ensure your ConversationResponse and any other models are defined in this file
+import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/conversation_model.dart';
+import 'package:my_app/data/models/network/password_update_model.dart';
 
 part 'rest_api_client.g.dart';
 
@@ -14,47 +11,39 @@ part 'rest_api_client.g.dart';
 abstract class RestAPIClient {
   factory RestAPIClient(Dio dio, {String? baseUrl}) = _RestAPIClient;
 
-  // ================= AUTH APIS =================
-
+  // ================= AUTH & PROFILE =================
   @POST("auth/login")
-  Future<LoginResponse> login(
-    @Body() Map<String, dynamic> body,
-  );
+  Future<LoginResponse> login(@Body() Map<String, dynamic> body);
 
   @POST("logout")
   Future<void> logout();
 
-  // ================= USER APIS =================
-
-  @POST("update-password")
-  Future<PasswordUpdateResponse> updatePassword(
-    @Body() PasswordUpdateRequest request,
-  );
-
   @GET("user/profile")
   Future<dynamic> getProfile();
 
+  @POST("update-password")
+  Future<PasswordUpdateResponse> updatePassword(@Body() PasswordUpdateRequest request);
+
+  // ================= LEAVE APIS =================
+  
+  // Note: Ensure this matches your Postman GET request path (e.g., "leaves" or "leaves/list")
+  @GET("leaves")
+  Future<dynamic> getLeaves();
+
+  // FIX: Added "/apply" to match your Postman screenshot successfully
+  @POST("leaves/apply")
+  Future<LeaveResponse> applyLeave(@Body() Map<String, dynamic> body);
+
+  @DELETE("leaves/{id}")
+  Future<void> cancelLeave(@Path("id") int id);
+
   // ================= CHAT APIS =================
-
-  /// 5. Setup Conversation
-  /// Expected Body: {"receiver_id": int} or your specific setup keys
   @POST("chat/setup")
-  Future<ConversationResponse> setupConversation(
-    @Body() Map<String, dynamic> body,
-  );
+  Future<ConversationResponse> setupConversation(@Body() Map<String, dynamic> body);
 
-  /// 6. Send Message
-  /// Expected Body: {"conversation_id": int, "message": "text"} 
-  /// (Based on your Postman screenshot, the key is 'message')
   @POST("chat/send")
-  Future<dynamic> sendWardenMessage(
-    @Body() Map<String, dynamic> body,
-  );
+  Future<dynamic> sendWardenMessage(@Body() Map<String, dynamic> body);
 
-  /// 7. Fetch Chat History
-  /// Retrieves messages for a specific conversation
-  @GET("chat/messages/{conversation_id}")
-  Future<dynamic> getChatHistory(
-    @Path("conversation_id") int conversationId,
-  );
+  @GET("chat/messages/{id}")
+  Future<dynamic> getChatHistory(@Path("id") int id);
 }

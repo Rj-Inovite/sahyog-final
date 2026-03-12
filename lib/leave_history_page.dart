@@ -1,14 +1,15 @@
-// File: leave_history_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:dio/dio.dart';
 
-// Update this import to your actual ApiService path
+// Ensure these imports match your actual folder structure
 import 'package:my_app/data/models/network/api_service.dart';
+import 'package:my_app/data/models/network/auth_local_storage.dart';
 
 class LeaveHistoryPage extends StatefulWidget {
-  final int userId;
-  const LeaveHistoryPage({super.key, required this.userId});
+  final int? userId;
+  const LeaveHistoryPage({super.key, this.userId});
 
   @override
   State<LeaveHistoryPage> createState() => _LeaveHistoryPageState();
@@ -16,42 +17,37 @@ class LeaveHistoryPage extends StatefulWidget {
 
 class _LeaveHistoryPageState extends State<LeaveHistoryPage>
     with SingleTickerProviderStateMixin {
-  // UI / theme
+  
+  // Theme & Constants
   final Color accent = const Color(0xFF6366F1);
   final Color success = const Color(0xFF10B981);
   final DateFormat _displayDate = DateFormat('dd MMM yyyy');
 
-  // Data
+  // State
   bool _loading = true;
   bool _submitting = false;
   String? _error;
   List<dynamic> _leaves = [];
+  int _userId = 0;
 
-  // Apply form state
+  // Form State
   String _selectedType = 'Sick Leave';
-  final List<String> _leaveTypes = [
-    'Sick Leave',
-    'Vacation',
-    'Emergency',
-    'Personal',
-    'Other'
-  ];
+  final List<String> _leaveTypes = ['Sick Leave', 'Vacation', 'Emergency', 'Personal', 'Other'];
   final TextEditingController _reasonController = TextEditingController();
-
-  // Calendar selection
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
 
-  // Animation controller for the top apply sheet
   late AnimationController _sheetController;
   bool _sheetOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _sheetController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _fetchLeaves();
+    _sheetController = AnimationController(
+      vsync: this, 
+      duration: const Duration(milliseconds: 300)
+    );
+    _initAndFetch();
   }
 
   @override
@@ -61,385 +57,171 @@ class _LeaveHistoryPageState extends State<LeaveHistoryPage>
     super.dispose();
   }
 
+  Future<void> _initAndFetch() async {
+    // 1. Resolve User ID
+    if (widget.userId != null) {
+      _userId = widget.userId!;
+    } else {
+      final idStr = await AuthLocalStorage.getUserId();
+      _userId = int.tryParse(idStr ?? '') ?? 0;
+    }
+    // 2. Fetch initial data
+    await _fetchLeaves();
+  }
+
   Future<void> _fetchLeaves() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final resp = await apiService.getLeaves(widget.userId);
-      if (resp.statusCode == 200) {
-        final data = resp.data;
-        List<dynamic> list;
-        if (data is Map && data['data'] != null) {
-          list = data['data'] as List<dynamic>;
-        } else if (data is List) {
-          list = data;
-        } else {
-          list = [];
-        }
-        setState(() => _leaves = list.reversed.toList());
-      } else {
-        setState(() => _error = 'Server error: ${resp.statusMessage}');
-      }
+      final List<dynamic> list = await apiService.getLeaves(_userId);
+      
+      setState(() {
+        _leaves = list.reversed.toList();
+        if (_leaves.isEmpty) _error = "No leave records found.";
+      });
     } catch (e) {
-      setState(() => _error = 'Failed to load leaves: $e');
+      setState(() {
+        if (e is DioException && e.response?.statusCode == 404) {
+          _error = "No leave records found.";
+        } else {
+          _error = "Failed to load leaves. Please try again.";
+        }
+      });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  // Toggle the apply sheet
-  void _toggleSheet() {
-    setState(() => _sheetOpen = !_sheetOpen);
-    if (_sheetOpen) {
-      _sheetController.forward();
-    } else {
-      _sheetController.reverse();
-    }
-  }
-
-  // Submit leave to API
   Future<void> _submitLeave() async {
-    if (_rangeStart == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please select start and end dates')));
-      return;
-    }
-
-    if (_reasonController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please provide a reason')));
+    if (_rangeStart == null || _reasonController.text.trim().isEmpty) {
+      _showSnackBar('Please select dates and provide a reason');
       return;
     }
 
     setState(() => _submitting = true);
 
     try {
-      final start = _rangeStart!;
-      final end = _rangeEnd ?? _rangeStart!;
+      // MATCHING POSTMAN: Use toUtc().toIso8601String() for the Laravel backend
+      final String start = _rangeStart!.toUtc().toIso8601String();
+      final String end = (_rangeEnd ?? _rangeStart!).toUtc().toIso8601String();
 
-      final startIso =
-          DateTime(start.year, start.month, start.day).toUtc().toIso8601String();
-      final endIso =
-          DateTime(end.year, end.month, end.day).toUtc().toIso8601String();
-
-      final response = await apiService.applyLeave(
-        userId: widget.userId,
+      await apiService.applyLeave(
+        userId: _userId,
         leaveType: _selectedType,
-        startDate: startIso,
-        endDate: endIso,
+        startDate: start,
+        endDate: end,
         reason: _reasonController.text.trim(),
       );
 
-      if (response.statusCode == 200) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Application Submitted'),
-            content:
-                const Text('You have applied for leave waiting for approval'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-
-        setState(() {
-          _reasonController.clear();
-          _rangeStart = null;
-          _rangeEnd = null;
-          _selectedType = _leaveTypes.first;
-          _sheetOpen = false;
-        });
-        _sheetController.reverse();
-
-        await _fetchLeaves();
-      } else {
-        final serverMsg = response.data != null && response.data['message'] != null
-            ? response.data['message']
-            : response.statusMessage ?? 'Failed to submit leave';
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $serverMsg')));
-      }
+      _showSuccessDialog();
+      _resetForm();
+      await _fetchLeaves();
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      _showSnackBar('Submission Failed: ${e.toString()}');
     } finally {
-      setState(() => _submitting = false);
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
-  // Calendar callbacks
-  void _onRangeSelected(DateTime? start, DateTime? end, DateTime focusedDay) {
+  void _resetForm() {
+    _reasonController.clear();
     setState(() {
-      _rangeStart = start;
-      _rangeEnd = end;
+      _rangeStart = null;
+      _rangeEnd = null;
+      _sheetOpen = false;
     });
+    _sheetController.reverse();
   }
 
-  Widget _buildApplySheet(BuildContext context) {
-    return SizeTransition(
-      sizeFactor:
-          CurvedAnimation(parent: _sheetController, curve: Curves.easeOut),
-      axisAlignment: -1,
-      child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          children: [
-            Row(
+  void _showSnackBar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Application Sent'),
+        content: const Text('Your leave request has been submitted successfully.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+        ],
+      ),
+    );
+  }
+
+  void _toggleSheet() {
+    setState(() => _sheetOpen = !_sheetOpen);
+    _sheetOpen ? _sheetController.forward() : _sheetController.reverse();
+  }
+
+  String _formatDisplayDate(String? iso) {
+    if (iso == null) return "—";
+    try {
+      return _displayDate.format(DateTime.parse(iso).toLocal());
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Leave History', style: TextStyle(color: Colors.white)),
+        backgroundColor: accent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(onPressed: _fetchLeaves, icon: const Icon(Icons.refresh)),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildApplySheet(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                    child: Text('Apply for Leave',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: accent))),
-                IconButton(
+                const Text('Your Leave Logs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ElevatedButton.icon(
                   onPressed: _toggleSheet,
-                  icon: const Icon(Icons.close),
-                )
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Leave type dropdown
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Container(
-                key: ValueKey(_selectedType),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedType,
-                    items: _leaveTypes
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedType = v ?? _selectedType),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Calendar (TableCalendar)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
-              ),
-              child: TableCalendar(
-                firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                lastDay: DateTime.now().add(const Duration(days: 365)),
-                focusedDay: _rangeStart ?? DateTime.now(),
-                rangeStartDay: _rangeStart,
-                rangeEndDay: _rangeEnd,
-                rangeSelectionMode: RangeSelectionMode.toggledOn,
-                onRangeSelected: (start, end, focusedDay) =>
-                    _onRangeSelected(start, end, focusedDay),
-                headerStyle: HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  titleTextStyle:
-                      TextStyle(color: accent, fontWeight: FontWeight.bold),
-                ),
-                calendarStyle: CalendarStyle(
-                  withinRangeDecoration: BoxDecoration(
-                      color: accent.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(8)),
-                  rangeStartDecoration: BoxDecoration(
-                      color: accent, borderRadius: BorderRadius.circular(8)),
-                  rangeEndDecoration: BoxDecoration(
-                      color: accent, borderRadius: BorderRadius.circular(8)),
-                  todayDecoration: BoxDecoration(
-                      color: accent.withOpacity(0.2), shape: BoxShape.circle),
-                  selectedDecoration:
-                      BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Selected dates summary
-            Row(
-              children: [
-                Icon(Icons.date_range, color: accent),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _rangeStart == null
-                        ? 'No dates selected'
-                        : _rangeEnd == null
-                            ? 'Start: ${_displayDate.format(_rangeStart!)}'
-                            : 'From ${_displayDate.format(_rangeStart!)} to ${_displayDate.format(_rangeEnd!)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  icon: Icon(_sheetOpen ? Icons.close : Icons.add, size: 18),
+                  label: Text(_sheetOpen ? 'Close' : 'Apply'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 12),
-
-            // Reason field
-            TextField(
-              controller: _reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Reason for leave...',
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Submit button
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: _submitting
-                  ? SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: null,
-                        icon: const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2)),
-                        label: const Text('Submitting...'),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: accent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12))),
-                      ),
-                    )
-                  : SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _submitLeave,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: accent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12))),
-                        child: const Text('Send Application',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
+          ),
+          const Divider(height: 1),
+          Expanded(child: _buildListSection()),
+        ],
       ),
     );
   }
 
-  Widget _buildLeaveTile(dynamic item) {
-    final leaveType = item['leave_type'] ?? '—';
-    final reason = item['reason'] ?? '';
-    final status = (item['status'] ?? 'pending').toString();
-    final id = item['id'] ?? 0;
-    final start = item['start_date'];
-    final end = item['end_date'];
-
-    String formatDate(String? iso) {
-      if (iso == null) return '—';
-      try {
-        final dt = DateTime.parse(iso).toLocal();
-        return _displayDate.format(dt);
-      } catch (_) {
-        return iso;
-      }
-    }
-
-    Color statusColor;
-    switch (status.toLowerCase()) {
-      case 'approved':
-        statusColor = success;
-        break;
-      case 'rejected':
-        statusColor = Colors.red;
-        break;
-      default:
-        statusColor = Colors.orange;
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        title: Text(
-            '$leaveType • ${formatDate(start)}${start != end ? ' - ${formatDate(end)}' : ''}',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(reason, maxLines: 2, overflow: TextOverflow.ellipsis),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text(status.toUpperCase(),
-                  style: TextStyle(
-                      color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-            const SizedBox(height: 6),
-            Text('#$id', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
-    }
-
-    if (_leaves.isEmpty) {
+  Widget _buildListSection() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null && _leaves.isEmpty) {
       return RefreshIndicator(
         onRefresh: _fetchLeaves,
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
           children: [
             const SizedBox(height: 80),
-            const Icon(Icons.holiday_village, size: 64, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Center(
-                child: Text('No leave records yet',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
-            const SizedBox(height: 8),
-            const Center(child: Text('Tap Apply to create your first leave request')),
-            const SizedBox(height: 200),
+            const Icon(Icons.history_toggle_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Center(child: Text(_error!, style: const TextStyle(color: Colors.grey))),
           ],
         ),
       );
@@ -448,62 +230,148 @@ class _LeaveHistoryPageState extends State<LeaveHistoryPage>
     return RefreshIndicator(
       onRefresh: _fetchLeaves,
       child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        padding: const EdgeInsets.only(bottom: 20),
         itemCount: _leaves.length,
-        itemBuilder: (ctx, i) => _buildLeaveTile(_leaves[i]),
+        itemBuilder: (ctx, i) => _buildLeaveCard(_leaves[i]),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Leave History'),
-        backgroundColor: accent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: _fetchLeaves,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Animated apply sheet
-          _buildApplySheet(context),
+  Widget _buildLeaveCard(dynamic item) {
+    final String status = (item['status'] ?? 'pending').toString().toLowerCase();
+    Color statusColor;
+    
+    if (status == 'approved') {
+      statusColor = success;
+    } else if (status == 'rejected') {
+      statusColor = Colors.redAccent;
+    } else {
+      statusColor = Colors.orangeAccent;
+    }
 
-          // Header with Apply button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 3,
+      shadowColor: Colors.black12,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(
-                    child: Text('Your leave requests',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                ElevatedButton.icon(
-                  onPressed: _toggleSheet,
-                  icon: const Icon(Icons.add),
-                  label: Text(_sheetOpen ? 'Close' : 'Apply'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: accent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                Text(item['leave_type'] ?? 'Leave', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(status.toUpperCase(), 
+                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
               ],
             ),
-          ),
-
-          const Divider(height: 1),
-
-          Expanded(child: _buildBody()),
-        ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.calendar_month, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  "${_formatDisplayDate(item['start_date'])} - ${_formatDisplayDate(item['end_date'])}",
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(item['reason'] ?? '', 
+              maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, color: Colors.black87)),
+            const Divider(height: 20),
+            Text("Request ID: #${item['id']}", style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: accent,
-        onPressed: _toggleSheet,
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildApplySheet() {
+    return SizeTransition(
+      sizeFactor: CurvedAnimation(parent: _sheetController, curve: Curves.easeInOut),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            DropdownButtonFormField<String>(
+              value: _selectedType,
+              items: _leaveTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+              onChanged: (v) => setState(() => _selectedType = v!),
+              decoration: InputDecoration(
+                labelText: 'Leave Type',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: TableCalendar(
+                firstDay: DateTime.now().subtract(const Duration(days: 30)),
+                lastDay: DateTime.now().add(const Duration(days: 365)),
+                focusedDay: _rangeStart ?? DateTime.now(),
+                rangeStartDay: _rangeStart,
+                rangeEndDay: _rangeEnd,
+                headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
+                rangeSelectionMode: RangeSelectionMode.toggledOn,
+                onRangeSelected: (start, end, focused) => setState(() { _rangeStart = start; _rangeEnd = end; }),
+                calendarStyle: CalendarStyle(
+                  rangeStartDecoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                  rangeEndDecoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                  rangeHighlightColor: accent.withOpacity(0.2),
+                  todayDecoration: BoxDecoration(color: accent.withOpacity(0.1), shape: BoxShape.circle),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _reasonController,
+              decoration: InputDecoration(
+                hintText: 'Enter reason for leave...',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _submitLeave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _submitting 
+                  ? const CircularProgressIndicator(color: Colors.white) 
+                  : const Text('Send Request', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
