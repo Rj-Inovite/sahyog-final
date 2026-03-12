@@ -1,52 +1,54 @@
 name: my_app
-description: "A new Flutter project."
+description: "A new Flutter project with Sahyog Face Recognition."
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
- sdk: ">=3.8.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  table_calendar: ^3.0.9
   cupertino_icons: ^1.0.6
 
-  # Networking
-  dio: ^5.4.0
-  retrofit: ^4.1.0
-  json_annotation: ^4.11.0
-  logger: ^2.0.2
-  shared_preferences: ^2.2.2
+  # --- Machine Learning & Camera ---
+  # Using 0.12.1+ for critical 16KB page alignment on Android 15+ (2026 standard)
+  tflite_flutter: ^0.12.1 
+  google_mlkit_face_detection: ^0.11.0
+  camera: ^0.11.0+2
+  image: ^4.2.0 # Essential for cropping face bounding boxes
 
-  # Camera and ML Kit
-  camera: ^0.11.0
-  google_mlkit_face_detection: ^0.13.2
-
-  # UI and Animations
-  animate_do: ^4.2.0
-  animated_text_kit: ^4.2.2
-
-  # Utilities
-  path_provider: ^2.1.1
-  path: ^1.8.3
-  intl: ^0.20.2
-  image_picker: ^1.2.1
-  url_launcher: ^6.2.5
+  # --- Networking (Dio & Retrofit) ---
+  dio: ^5.5.0
+  retrofit: ^4.4.1
+  json_annotation: ^4.9.0
+  http: ^1.2.2
   pretty_dio_logger: ^1.4.0
+  url_launcher: ^6.3.0
+
+  # --- UI & Animation ---
+  animate_do: ^3.1.2
+  animated_text_kit: ^4.2.2
+  table_calendar: ^3.0.9
+  logger: ^2.4.0
+
+  # --- Local Storage & Utils ---
+  shared_preferences: ^2.3.2
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  intl: ^0.19.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.14.4
-
-  # Builders
-  build_runner: ^2.4.8
-  # Downgraded to 7.0.8 to avoid the "mapperCode" compilation error
-  retrofit_generator: ^10.2.3 
-  json_serializable: ^6.7.1
+  flutter_lints: ^3.0.0
+  
+  # Builders for Retrofit/Json
+  build_runner: ^2.4.11
+  retrofit_generator: ^8.1.1
+  json_serializable: ^6.8.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
@@ -55,10 +57,5 @@ flutter:
     - assets/images/logo.png
     - assets/images/g_logo.png
     - assets/images/b_logo.png
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/images/logo.png"
-  adaptive_icon_background: "#ffffff"
-  adaptive_icon_foreground: "assets/images/logo.png"
+    - assets/mobilefacenet.tflite
+    - assets/images/

@@ -6,7 +6,7 @@ import 'register.dart';
 
 // --- THEME CONSTANTS ---
 const Color sunsetOrange = Color(0xFFFF8C42);
-const Color warmYellow = Color(0xFFF9D423);
+const Color warmYellow = Color.fromRGBO(189, 95, 7, 1);
 const Color backgroundWhite = Color(0xFFFAFAFA);
 const Color textDark = Color(0xFF2D3436);
 
