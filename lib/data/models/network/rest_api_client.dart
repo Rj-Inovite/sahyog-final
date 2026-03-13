@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-// Model imports - ensuring these match your project structure
+// Model imports - ensure these paths match your project exactly
 import 'package:my_app/data/models/login_response.dart';
 import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/conversation_model.dart';
@@ -15,9 +15,12 @@ abstract class RestAPIClient {
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 
+  /// Fetches students awaiting enrollment from the public endpoint
   @GET("public/pending-enrollment")
   Future<dynamic> getPendingEnrollments();
 
+  /// Submits the 192-dimension face vector to the server
+  /// Body: {"student_id": int, "face_vector": List<double>}
   @POST("attendance-enrollment")
   Future<dynamic> submitEnrollment(@Body() Map<String, dynamic> body);
 
@@ -31,6 +34,10 @@ abstract class RestAPIClient {
 
   @GET("user/profile")
   Future<dynamic> getProfile();
+
+  // ✅ ADDED: Fetch detailed student view from Web Dashboard
+  @GET("student/view/{id}")
+  Future<dynamic> getStudentView(@Path("id") int id);
 
   @POST("update-password")
   Future<PasswordUpdateResponse> updatePassword(@Body() PasswordUpdateRequest request);
@@ -46,20 +53,17 @@ abstract class RestAPIClient {
   @DELETE("leaves/{id}")
   Future<void> cancelLeave(@Path("id") int id);
 
-  // ================= CHAT APIS (REFINED FOR TOKEN SYNC) =================
+  // ================= CHAT APIS =================
   
-  /// This endpoint uses your Bearer Token to identify 'Ruchi' (ID 62).
-  /// It creates or joins the "General Chat Room" for the web panel.
+  /// Setup/Join a conversation room
   @POST("chat/setup")
   Future<dynamic> setupConversation(@Body() Map<String, dynamic> body);
 
-  /// Sends your message to the Web Panel using the Conversation ID.
-  /// Body: {"conversation_id": X, "message": "..."}
+  /// Sends a message to a conversation
   @POST("chat/send")
   Future<dynamic> sendWardenMessage(@Body() Map<String, dynamic> body);
 
-  /// Fetches the message history for the specific room.
-  /// Path: chat/messages/4 (as seen in your Postman)
+  /// Fetches history for a specific conversation ID
   @GET("chat/messages/{id}")
   Future<dynamic> getChatHistory(@Path("id") int id);
 }

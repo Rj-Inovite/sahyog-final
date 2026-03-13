@@ -1,19 +1,19 @@
-// File: auth_local_storage.dart
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Centralized local storage for authentication-related values.
-/// Keeps API surface minimal and stable so other APIs remain unaffected.
+/// Designed to be non-intrusive to other APIs like Leaves or Face Registration.
 class AuthLocalStorage {
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
   static const String _userRoleKey = 'user_role';
 
-  AuthLocalStorage._(); // prevent instantiation
+  // Private constructor to prevent instantiation
+  AuthLocalStorage._(); 
 
   // --- SAVE DATA ---
 
-  /// Save token and user id (and optional role) after successful login.
-  /// Stores values as strings to keep compatibility with existing code.
+  /// Save token, user id, and optional role after successful login.
+  /// Stores values as strings for maximum compatibility across the app.
   static Future<void> saveAuthData({
     required String token,
     required String id,
@@ -27,13 +27,13 @@ class AuthLocalStorage {
     }
   }
 
-  /// Save only token (useful for token refresh flows).
+  /// Save only token (useful for token refresh or profile sync flows).
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
   }
 
-  /// Save only user id (if needed separately).
+  /// Save only user id.
   static Future<void> saveUserId(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userIdKey, id);
@@ -41,19 +41,19 @@ class AuthLocalStorage {
 
   // --- GETTERS ---
 
-  /// Returns stored Bearer token or null if not present.
+  /// Returns stored Bearer token. Essential for Dio Interceptors.
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
   }
 
-  /// Returns stored user id as string or null if not present.
+  /// Returns stored user id. Used by StudentProfile to fetch web data.
   static Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userIdKey);
   }
 
-  /// Returns stored user role (e.g., "student", "warden") or null.
+  /// Returns stored user role (e.g., "student", "warden").
   static Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userRoleKey);
@@ -67,8 +67,8 @@ class AuthLocalStorage {
     return token != null && token.isNotEmpty;
   }
 
-  /// Clears only auth-related keys (safer than prefs.clear()).
-  /// Use this on logout to avoid disturbing other stored app data.
+  /// Clears only auth-related keys.
+  /// This is the "Safe Logout" - it doesn't touch your other app settings.
   static Future<void> clearAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
@@ -76,8 +76,7 @@ class AuthLocalStorage {
     await prefs.remove(_userRoleKey);
   }
 
-  /// Completely clears all SharedPreferences (use with caution).
-  /// Provided for completeness but not used by default to avoid disturbing other APIs.
+  /// Full reset. Use only if a total app reset is required.
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

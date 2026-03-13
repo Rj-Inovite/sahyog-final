@@ -1,13 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'rest_api_client.dart';
 import 'auth_local_storage.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:flutter/material.dart';
 
-/// Interceptor to automatically inject the Bearer Token into every request.
-/// This ensures "Ruchi" is recognized by the Web Panel without hard-coding IDs.
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -36,7 +34,6 @@ class ApiService {
 
     _dio.interceptors.add(AuthInterceptor());
     
-    // LogInterceptor helps you see the ticks (seen/sent) status in the terminal
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
       responseBody: true, 
@@ -47,15 +44,30 @@ class ApiService {
     client = RestAPIClient(_dio);
   }
 
+  // ================= STUDENT PROFILE VIEW (NEW) =================
+
+  /// Fetches detailed student data from the web dashboard
+  /// Endpoint: GET student/view/{id}
+  Future<dynamic> getStudentProfileView(int studentId) async {
+    try {
+      // We call the client method we defined in Step 1
+      final response = await client.getStudentView(studentId);
+      return response; 
+    } catch (e) {
+      debugPrint("Error fetching Student View: $e");
+      rethrow;
+    }
+  }
+
   // ================= BIOMETRIC / REGISTRATION APIS =================
 
   Future<List<dynamic>> getPendingEnrollments() async {
     try {
-      final dynamic response = await client.getPendingEnrollments();
-      if (response is Map && response.containsKey('data')) {
-        return response['data'] as List<dynamic>;
-      } else if (response is List) {
-        return response;
+      final response = await _dio.get("public/pending-enrollment");
+      if (response.data is Map && response.data.containsKey('data')) {
+        return response.data['data'] as List<dynamic>;
+      } else if (response.data is List) {
+        return response.data;
       }
       return [];
     } catch (e) {
@@ -117,7 +129,6 @@ class ApiService {
 
   // ================= CHAT APIS (WHATSAPP FEATURES) =================
 
-  /// Initializes conversation room. Identifies user via Token.
   Future<dynamic> setupChat() async {
     try {
       return await client.setupConversation({
@@ -130,7 +141,6 @@ class ApiService {
     }
   }
   
-  /// Sends a new message.
   Future<dynamic> sendMessage(int conversationId, String message) async {
     try {
       final payload = {
@@ -144,7 +154,6 @@ class ApiService {
     }
   }
       
-  /// Fetches history. Gracefully handles 404 for empty rooms.
   Future<dynamic> getChatMessages(int conversationId) async {
     try {
       return await client.getChatHistory(conversationId);
@@ -156,10 +165,8 @@ class ApiService {
     }
   }
 
-  /// WHATSAPP FEATURE: Delete Message
   Future<dynamic> deleteMessage(int messageId) async {
     try {
-      // Assuming your backend has a delete endpoint: chat/message/{id}
       return await _dio.delete("chat/messages/$messageId");
     } catch (e) {
       debugPrint("Delete Error: $e");
@@ -167,10 +174,8 @@ class ApiService {
     }
   }
 
-  /// WHATSAPP FEATURE: Edit Message
   Future<dynamic> editMessage(int messageId, String newText) async {
     try {
-      // Assuming your backend has an update endpoint
       return await _dio.put("chat/messages/$messageId", data: {"message": newText});
     } catch (e) {
       debugPrint("Edit Error: $e");
@@ -178,7 +183,6 @@ class ApiService {
     }
   }
 
-  /// WHATSAPP FEATURE: Share File/Image
   Future<dynamic> uploadChatFile(int conversationId, File file) async {
     try {
       String fileName = file.path.split('/').last;
