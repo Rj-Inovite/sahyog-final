@@ -1,0 +1,425 @@
+import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+// Assuming this is your local storage file path
+
+import 'data/models/network/auth_local_storage.dart'; 
+
+// --- THEME CONSTANTS ---
+const Color sunsetOrange = Color(0xFFFF8C42);
+const Color textDark = Color(0xFF2D3436);
+
+class WardenInboxPage extends StatefulWidget {
+  const WardenInboxPage({super.key});
+
+  @override
+  State<WardenInboxPage> createState() => _WardenInboxPageState();
+}
+
+class _WardenInboxPageState extends State<WardenInboxPage> {
+  // In a real app, this list would also be fetched from an API (e.g., /api/conversations)
+  final List<Map<String, dynamic>> chats = [
+    {"name": "Sneha Patel", "gender": "girl", "msg": "Sir, need leave for 2 days.", "isGroup": false, "studentId": "101"},
+    {"name": "Rahul Sharma", "gender": "boy", "msg": "I have lost my room key.", "isGroup": false, "studentId": "102"},
+  ];
+
+  void _editName(int index) {
+    TextEditingController nameCtrl = TextEditingController(text: chats[index]['name']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Name"),
+        content: TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Enter Name")),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              setState(() => chats[index]['name'] = nameCtrl.text);
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _createNewGroup() {
+    List<String> students = ["Aryan", "Rahul", "Sneha", "Priya", "Deepak"];
+    List<String> selected = [];
+    TextEditingController groupNameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Create New Group"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: groupNameCtrl, decoration: const InputDecoration(hintText: "Group Name")),
+              const SizedBox(height: 10),
+              const Text("Select Members:", style: TextStyle(fontWeight: FontWeight.bold)),
+              ...students.map((s) => CheckboxListTile(
+                    title: Text(s),
+                    value: selected.contains(s),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        val! ? selected.add(s) : selected.remove(s);
+                      });
+                    },
+                  )),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () {
+                if (groupNameCtrl.text.isNotEmpty && selected.isNotEmpty) {
+                  setState(() {
+                    chats.insert(0, {
+                      "name": groupNameCtrl.text,
+                      "gender": "group",
+                      "msg": "Group created by Warden",
+                      "isGroup": true,
+                      "studentId": "group_${DateTime.now().millisecondsSinceEpoch}"
+                    });
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Create"),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: sunsetOrange,
+        onPressed: _createNewGroup,
+        child: const Icon(Icons.group_add, color: Colors.white),
+      ),
+      body: ListView.builder(
+        itemCount: chats.length,
+        itemBuilder: (ctx, i) => ListTile(
+          leading: CircleAvatar(
+            backgroundColor: chats[i]['gender'] == 'girl'
+                ? Colors.pink[100]
+                : chats[i]['gender'] == 'boy'
+                    ? Colors.blue[100]
+                    : Colors.orange[100],
+            child: Icon(
+              chats[i]['isGroup'] ? Icons.groups : Icons.person,
+              color: chats[i]['gender'] == 'girl'
+                  ? Colors.pink
+                  : chats[i]['gender'] == 'boy'
+                      ? Colors.blue
+                      : Colors.orange,
+            ),
+          ),
+          title: Text(chats[i]['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(chats[i]['msg']!, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("12:00 PM", style: TextStyle(fontSize: 10, color: Colors.grey)),
+              IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => _editName(i)),
+            ],
+          ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => ChatDetailPage(
+                      name: chats[i]['name']!,
+                      gender: chats[i]['gender']!,
+                      isGroup: chats[i]['isGroup'],
+                      studentId: chats[i]['studentId'], // Passing ID for API use
+                    )),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- CHAT DETAIL PAGE WITH API INTEGRATION ---
+class ChatDetailPage extends StatefulWidget {
+  final String name, gender, studentId;
+  final bool isGroup;
+  const ChatDetailPage({
+    super.key, 
+    required this.name, 
+    required this.gender, 
+    required this.studentId,
+    this.isGroup = false
+  });
+
+  @override
+  State<ChatDetailPage> createState() => _ChatDetailPageState();
+}
+
+class _ChatDetailPageState extends State<ChatDetailPage> {
+  final List<Map<String, dynamic>> _msgs = [];
+  final _ctrl = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  late Dio _dio;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupDio();
+    _fetchChatHistory();
+  }
+
+  // Initialize Dio with Token Interceptor
+  void _setupDio() {
+    _dio = Dio(BaseOptions(
+      baseUrl: "https://your-laravel-backend.com/api", // Replace with your URL
+      connectTimeout: const Duration(seconds: 5),
+    ));
+
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        // GET TOKEN FROM YOUR LOCAL STORAGE
+        String? token = await AuthLocalStorage.getToken(); 
+        if (token != null) {
+          options.headers["Authorization"] = "Bearer $token";
+        }
+        return handler.next(options);
+      },
+      onError: (DioException e, handler) {
+        if (e.response?.statusCode == 401) {
+          debugPrint("Unauthorized - Token expired or invalid");
+        }
+        return handler.next(e);
+      }
+    ));
+  }
+
+  // API: Fetch messages for this specific student/conversation
+  Future<void> _fetchChatHistory() async {
+    try {
+      final response = await _dio.get("/messages/${widget.studentId}");
+      if (response.statusCode == 200) {
+        final List data = response.data['data']; // Adjust based on Laravel response structure
+        setState(() {
+          _msgs.clear();
+          for (var item in data) {
+            _msgs.add({
+              "text": item['message'],
+              "isWarden": item['sender_type'] == 'warden',
+              "status": "read",
+              "time": item['time_label'] ?? "Recently"
+            });
+          }
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint("Fetch Error: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // API: Send Message
+  void _sendMessage() async {
+    if (_ctrl.text.trim().isEmpty) return;
+
+    String textToSend = _ctrl.text.trim();
+    _ctrl.clear();
+
+    // UI Optimistic Update
+    setState(() {
+      _msgs.add({
+        "text": textToSend,
+        "isWarden": true,
+        "status": "sent",
+        "time": "Now"
+      });
+    });
+    _scrollToBottom();
+
+    try {
+      final response = await _dio.post("/messages/send", data: {
+        "receiver_id": widget.studentId,
+        "message": textToSend,
+      });
+
+      if (response.statusCode == 200) {
+        setState(() => _msgs.last['status'] = "delivered");
+      }
+    } catch (e) {
+      debugPrint("Send Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to send message"))
+      );
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Widget _getStatusIcon(String status) {
+    if (status == "sent") return const Icon(Icons.check, size: 14, color: Colors.grey);
+    if (status == "delivered") return const Icon(Icons.done_all, size: 14, color: Colors.grey);
+    if (status == "read") return const Icon(Icons.done_all, size: 14, color: Colors.blue);
+    return const SizedBox();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Color themeColor = widget.gender == 'girl' ? Colors.pink : (widget.gender == 'boy' ? Colors.blue : Colors.orange);
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: themeColor,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              child: Icon(widget.isGroup ? Icons.groups : Icons.person, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.name, style: const TextStyle(fontSize: 16, color: Colors.white)),
+                  Text(widget.isGroup ? "tap for group info" : "online", style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: NetworkImage("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"),
+            fit: BoxFit.cover,
+            opacity: 0.05,
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    itemCount: _msgs.length,
+                    itemBuilder: (ctx, i) {
+                      bool isWarden = _msgs[i]['isWarden'];
+                      return Align(
+                        alignment: isWarden ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isWarden ? const Color(0xFFE7FFDB) : Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(12),
+                              topRight: const Radius.circular(12),
+                              bottomLeft: isWarden ? const Radius.circular(12) : Radius.zero,
+                              bottomRight: isWarden ? Radius.zero : const Radius.circular(12),
+                            ),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                          ),
+                          child: Stack(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12, right: 10),
+                                child: Text(_msgs[i]['text'], style: const TextStyle(fontSize: 15, color: textDark)),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Row(
+                                  children: [
+                                    Text(_msgs[i]['time'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                    const SizedBox(width: 4),
+                                    if (isWarden) _getStatusIcon(_msgs[i]['status']),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+            ),
+            _buildMessageInput(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 20, top: 10),
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: Card(
+              elevation: 0,
+              color: Colors.grey[100],
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+              child: Row(
+                children: [
+                  const SizedBox(width: 10),
+                  const Icon(Icons.emoji_emotions_outlined, color: Colors.grey),
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: const InputDecoration(
+                        hintText: "Message",
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.attach_file, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.camera_alt, color: Colors.grey),
+                  const SizedBox(width: 15),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          CircleAvatar(
+            backgroundColor: sunsetOrange,
+            radius: 25,
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.white), 
+              onPressed: _sendMessage
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

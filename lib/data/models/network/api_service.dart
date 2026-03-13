@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'rest_api_client.dart';
 import 'auth_local_storage.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
+import 'package:flutter/material.dart';
 
+/// Interceptor to automatically inject the Bearer Token into every request.
+/// This ensures "Ruchi" is recognized by the Web Panel without hard-coding IDs.
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -30,10 +35,13 @@ class ApiService {
     ));
 
     _dio.interceptors.add(AuthInterceptor());
+    
+    // LogInterceptor helps you see the ticks (seen/sent) status in the terminal
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
       responseBody: true, 
-      requestHeader: true
+      requestHeader: true,
+      error: true,
     ));
 
     client = RestAPIClient(_dio);
@@ -41,13 +49,9 @@ class ApiService {
 
   // ================= BIOMETRIC / REGISTRATION APIS =================
 
-  /// Fetches the list of students waiting for face enrollment
   Future<List<dynamic>> getPendingEnrollments() async {
     try {
-      // Calling the client endpoint: public/pending-enrollment
       final dynamic response = await client.getPendingEnrollments();
-      
-      // Postman data shows this is a direct list or inside 'data'
       if (response is Map && response.containsKey('data')) {
         return response['data'] as List<dynamic>;
       } else if (response is List) {
@@ -55,12 +59,11 @@ class ApiService {
       }
       return [];
     } catch (e) {
-      print("Error fetching pending enrollments: $e");
+      debugPrint("Error fetching pending enrollments: $e");
       return [];
     }
   }
 
-  /// Submits the 192-dimensional face vector to the server
   Future<dynamic> submitEnrollment(int studentId, List<double> faceVector) async {
     final payload = {
       "student_id": studentId,
@@ -69,7 +72,7 @@ class ApiService {
     return await client.submitEnrollment(payload);
   }
 
-  // ================= PROFILE & AUTH APIS (DO NOT REMOVE) =================
+  // ================= PROFILE & AUTH APIS =================
   
   Future<dynamic> getProfile() => client.getProfile();
 
@@ -91,10 +94,7 @@ class ApiService {
       }
       return [];
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        print("Warning: The leaves endpoint was not found on the server.");
-        return []; 
-      }
+      if (e.response?.statusCode == 404) return []; 
       rethrow;
     }
   }
@@ -115,14 +115,83 @@ class ApiService {
     return await client.applyLeave(payload);
   }
 
-  // ================= CHAT APIS =================
+  // ================= CHAT APIS (WHATSAPP FEATURES) =================
 
-  Future<dynamic> setupChat(int id) => client.setupConversation({"receiver_id": id});
+  /// Initializes conversation room. Identifies user via Token.
+  Future<dynamic> setupChat() async {
+    try {
+      return await client.setupConversation({
+        "name": "General Chat Room",
+        "type": "group"
+      });
+    } catch (e) {
+      debugPrint("Setup Chat Error: $e");
+      return null;
+    }
+  }
   
-  Future<dynamic> sendMessage(int cId, String msg) => 
-      client.sendWardenMessage({"conversation_id": cId, "message": msg});
+  /// Sends a new message.
+  Future<dynamic> sendMessage(int conversationId, String message) async {
+    try {
+      final payload = {
+        "conversation_id": conversationId,
+        "message": message
+      };
+      return await client.sendWardenMessage(payload);
+    } catch (e) {
+      debugPrint("Send Message Error: $e");
+      rethrow;
+    }
+  }
       
-  Future<dynamic> getChatMessages(int cId) => client.getChatHistory(cId);
+  /// Fetches history. Gracefully handles 404 for empty rooms.
+  Future<dynamic> getChatMessages(int conversationId) async {
+    try {
+      return await client.getChatHistory(conversationId);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return {"success": true, "messages": []};
+      }
+      rethrow;
+    }
+  }
+
+  /// WHATSAPP FEATURE: Delete Message
+  Future<dynamic> deleteMessage(int messageId) async {
+    try {
+      // Assuming your backend has a delete endpoint: chat/message/{id}
+      return await _dio.delete("chat/messages/$messageId");
+    } catch (e) {
+      debugPrint("Delete Error: $e");
+      return null;
+    }
+  }
+
+  /// WHATSAPP FEATURE: Edit Message
+  Future<dynamic> editMessage(int messageId, String newText) async {
+    try {
+      // Assuming your backend has an update endpoint
+      return await _dio.put("chat/messages/$messageId", data: {"message": newText});
+    } catch (e) {
+      debugPrint("Edit Error: $e");
+      return null;
+    }
+  }
+
+  /// WHATSAPP FEATURE: Share File/Image
+  Future<dynamic> uploadChatFile(int conversationId, File file) async {
+    try {
+      String fileName = file.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "conversation_id": conversationId,
+        "file": await MultipartFile.fromFile(file.path, filename: fileName),
+      });
+      return await _dio.post("chat/upload", data: formData);
+    } catch (e) {
+      debugPrint("File Upload Error: $e");
+      return null;
+    }
+  }
 }
 
 final apiService = ApiService();

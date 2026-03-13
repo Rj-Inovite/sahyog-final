@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-// Ensure this filename matches your actual registration file
 import 'register.dart'; 
-import 'register.dart';
+// --- IMPORTING THE SEPARATED INBOX CODE ---
+import 'warden-response.dart'; 
 
 // --- THEME CONSTANTS ---
 const Color sunsetOrange = Color(0xFFFF8C42);
@@ -30,7 +30,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
   final List<Widget> _pages = [
     const ConsoleHome(),
     const StudentDirectoryPage(),
-    const WardenInboxPage(),
+    const WardenInboxPage(), // This now comes from warden-response.dart
     const AdminSetupPage(),
   ];
 
@@ -97,7 +97,7 @@ class ConsoleHome extends StatelessWidget {
                 const SizedBox(height: 15),
                 _buildMetricsRow(context),
                 const SizedBox(height: 25),
-                const ShinyRegistryButton(), // This button handles navigation
+                const ShinyRegistryButton(),
                 const SizedBox(height: 25),
                 const Text("Management Modules", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 15),
@@ -199,7 +199,7 @@ class ConsoleHome extends StatelessWidget {
   }
 }
 
-// --- ANIMATED SHINY REGISTRY BUTTON (REDIRECT LOGIC) ---
+// --- ANIMATED SHINY REGISTRY BUTTON ---
 class ShinyRegistryButton extends StatefulWidget {
   const ShinyRegistryButton({super.key});
 
@@ -258,10 +258,11 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),onPressed: () => Navigator.push(
-  context, 
-  MaterialPageRoute(builder: (context) => const RegisterStudent())
-),
+            ),
+            onPressed: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (context) => const RegisterStudent())
+            ),
             icon: const Icon(Icons.app_registration_rounded, color: textDark),
             label: const Text(
               "NEW STUDENT REGISTRY",
@@ -441,7 +442,50 @@ class StaffCard extends StatelessWidget {
   }
 }
 
-// --- OCCUPANCY, GATE, COMPLAINTS ---
+// --- GATE RECORDS ---
+class GateRecordsPage extends StatelessWidget {
+  const GateRecordsPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text("Gate Security Logs"), backgroundColor: sunsetOrange),
+        body: ListView.builder(
+          itemCount: 20,
+          itemBuilder: (ctx, i) => ListTile(
+            leading: Icon(i % 2 == 0 ? Icons.logout : Icons.login, color: i % 2 == 0 ? Colors.red : Colors.green),
+            title: Text("Student SAH-${101 + i}"),
+            subtitle: Text("Time: 0${(i % 12) + 1}:00 PM | Purpose: Outing"),
+            trailing: const Text("Verified"),
+          ),
+        ),
+      );
+}
+
+// --- COMPLAINTS ---
+class ComplaintManagementPage extends StatelessWidget {
+  const ComplaintManagementPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text("Student Complaints"), backgroundColor: sunsetOrange),
+        body: ListView(
+          padding: const EdgeInsets.all(10),
+          children: [
+            _compCard("Water Leakage", "Room 302", "Urgent", Colors.red),
+            _compCard("WiFi Down", "Wing B", "Medium", Colors.orange),
+            _compCard("Fan Repair", "Room 105", "Low", Colors.blue),
+          ],
+        ),
+      );
+
+  Widget _compCard(String t, String r, String p, Color c) => Card(
+        child: ListTile(
+          title: Text(t),
+          subtitle: Text(r),
+          trailing: Chip(label: Text(p), backgroundColor: c.withOpacity(0.2)),
+        ),
+      );
+}
+
+// --- OCCUPANCY ---
 class OccupancyStatsPage extends StatelessWidget {
   const OccupancyStatsPage({super.key});
   @override
@@ -467,362 +511,6 @@ class OccupancyStatsPage extends StatelessWidget {
           trailing: Text(d),
         ),
       );
-}
-
-class GateRecordsPage extends StatelessWidget {
-  const GateRecordsPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text("Gate Security Logs"), backgroundColor: sunsetOrange),
-        body: ListView.builder(
-          itemCount: 20,
-          itemBuilder: (ctx, i) => ListTile(
-            leading: Icon(i % 2 == 0 ? Icons.logout : Icons.login, color: i % 2 == 0 ? Colors.red : Colors.green),
-            title: Text("Student SAH-${101 + i}"),
-            subtitle: Text("Time: 0${(i % 12) + 1}:00 PM | Purpose: Outing"),
-            trailing: const Text("Verified"),
-          ),
-        ),
-      );
-}
-
-class ComplaintManagementPage extends StatelessWidget {
-  const ComplaintManagementPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text("Student Complaints"), backgroundColor: sunsetOrange),
-        body: ListView(
-          padding: const EdgeInsets.all(10),
-          children: [
-            _compCard("Water Leakage", "Room 302", "Urgent", Colors.red),
-            _compCard("WiFi Down", "Wing B", "Medium", Colors.orange),
-            _compCard("Fan Repair", "Room 105", "Low", Colors.blue),
-          ],
-        ),
-      );
-
-  Widget _compCard(String t, String r, String p, Color c) => Card(
-        child: ListTile(
-          title: Text(t),
-          subtitle: Text(r),
-          trailing: Chip(label: Text(p), backgroundColor: c.withOpacity(0.2)),
-        ),
-      );
-}
-
-// --- UPDATED INBOX ---
-class WardenInboxPage extends StatefulWidget {
-  const WardenInboxPage({super.key});
-
-  @override
-  State<WardenInboxPage> createState() => _WardenInboxPageState();
-}
-
-class _WardenInboxPageState extends State<WardenInboxPage> {
-  final List<Map<String, dynamic>> chats = [
-    {"name": "Sneha Patel", "gender": "girl", "msg": "Sir, need leave for 2 days.", "isGroup": false},
-    {"name": "Rahul Sharma", "gender": "boy", "msg": "I have lost my room key.", "isGroup": false},
-  ];
-
-  void _editName(int index) {
-    TextEditingController nameCtrl = TextEditingController(text: chats[index]['name']);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Name"),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Enter Name")),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => chats[index]['name'] = nameCtrl.text);
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _createNewGroup() {
-    List<String> students = ["Aryan", "Rahul", "Sneha", "Priya", "Deepak"];
-    List<String> selected = [];
-    TextEditingController groupNameCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Create New Group"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: groupNameCtrl, decoration: const InputDecoration(hintText: "Group Name")),
-              const SizedBox(height: 10),
-              const Text("Select Members:", style: TextStyle(fontWeight: FontWeight.bold)),
-              ...students.map((s) => CheckboxListTile(
-                    title: Text(s),
-                    value: selected.contains(s),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        val! ? selected.add(s) : selected.remove(s);
-                      });
-                    },
-                  )),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            ElevatedButton(
-              onPressed: () {
-                if (groupNameCtrl.text.isNotEmpty && selected.isNotEmpty) {
-                  setState(() {
-                    chats.insert(0, {
-                      "name": groupNameCtrl.text,
-                      "gender": "group",
-                      "msg": "Group created by Warden",
-                      "isGroup": true
-                    });
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text("Create"),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: sunsetOrange,
-        onPressed: _createNewGroup,
-        child: const Icon(Icons.group_add, color: Colors.white),
-      ),
-      body: ListView.builder(
-        itemCount: chats.length,
-        itemBuilder: (ctx, i) => ListTile(
-          leading: CircleAvatar(
-            backgroundColor: chats[i]['gender'] == 'girl'
-                ? Colors.pink[100]
-                : chats[i]['gender'] == 'boy'
-                    ? Colors.blue[100]
-                    : Colors.orange[100],
-            child: Icon(
-              chats[i]['isGroup'] ? Icons.groups : Icons.person,
-              color: chats[i]['gender'] == 'girl'
-                  ? Colors.pink
-                  : chats[i]['gender'] == 'boy'
-                      ? Colors.blue
-                      : Colors.orange,
-            ),
-          ),
-          title: Text(chats[i]['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(chats[i]['msg']!, maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("12:00 PM", style: TextStyle(fontSize: 10, color: Colors.grey)),
-              IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => _editName(i)),
-            ],
-          ),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => ChatDetailPage(
-                      name: chats[i]['name']!,
-                      gender: chats[i]['gender']!,
-                      isGroup: chats[i]['isGroup'],
-                    )),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// --- CHAT DETAIL ---
-class ChatDetailPage extends StatefulWidget {
-  final String name, gender;
-  final bool isGroup;
-  const ChatDetailPage({super.key, required this.name, required this.gender, this.isGroup = false});
-  @override
-  State<ChatDetailPage> createState() => _ChatDetailPageState();
-}
-
-class _ChatDetailPageState extends State<ChatDetailPage> {
-  final List<Map<String, dynamic>> _msgs = [
-    {"text": "Hello Warden, how are you?", "isWarden": false, "status": "read", "time": "10:00 AM"},
-  ];
-  final _ctrl = TextEditingController();
-
-  void _sendMessage() {
-    if (_ctrl.text.trim().isNotEmpty) {
-      setState(() {
-        _msgs.add({
-          "text": _ctrl.text,
-          "isWarden": true,
-          "status": "sent",
-          "time": "${DateTime.now().hour}:${DateTime.now().minute}"
-        });
-        _ctrl.clear();
-      });
-
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) setState(() => _msgs.last['status'] = "delivered");
-      });
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _msgs.last['status'] = "read");
-      });
-    }
-  }
-
-  Widget _getStatusIcon(String status) {
-    if (status == "sent") return const Icon(Icons.check, size: 14, color: Colors.grey);
-    if (status == "delivered") return const Icon(Icons.done_all, size: 14, color: Colors.grey);
-    if (status == "read") return const Icon(Icons.done_all, size: 14, color: Colors.blue);
-    return const SizedBox();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Color themeColor = widget.gender == 'girl' ? Colors.pink : (widget.gender == 'boy' ? Colors.blue : Colors.orange);
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: themeColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white24,
-              child: Icon(widget.isGroup ? Icons.groups : Icons.person, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.name, style: const TextStyle(fontSize: 16, color: Colors.white)),
-                  Text(widget.isGroup ? "tap for group info" : "online", style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"),
-            fit: BoxFit.cover,
-            opacity: 0.05,
-          ),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                itemCount: _msgs.length,
-                itemBuilder: (ctx, i) {
-                  bool isWarden = _msgs[i]['isWarden'];
-                  return Align(
-                    alignment: isWarden ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isWarden ? const Color(0xFFE7FFDB) : Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(12),
-                          topRight: const Radius.circular(12),
-                          bottomLeft: isWarden ? const Radius.circular(12) : Radius.zero,
-                          bottomRight: isWarden ? Radius.zero : const Radius.circular(12),
-                        ),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 1))],
-                      ),
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12, right: 10),
-                            child: Text(_msgs[i]['text'], style: const TextStyle(fontSize: 15, color: textDark)),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Row(
-                              children: [
-                                Text(_msgs[i]['time'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                const SizedBox(width: 4),
-                                if (isWarden) _getStatusIcon(_msgs[i]['status']),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            _buildMessageInput(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: Card(
-              elevation: 0,
-              color: Colors.grey[100],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-              child: Row(
-                children: [
-                  const SizedBox(width: 10),
-                  const Icon(Icons.emoji_emotions_outlined, color: Colors.grey),
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      decoration: const InputDecoration(
-                        hintText: "Message",
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.attach_file, color: Colors.grey),
-                  const SizedBox(width: 10),
-                  const Icon(Icons.camera_alt, color: Colors.grey),
-                  const SizedBox(width: 15),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-          CircleAvatar(
-            backgroundColor: sunsetOrange,
-            radius: 25,
-            child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // --- PROFILE, DIRECTORY, SETUP ---
