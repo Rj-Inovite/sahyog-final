@@ -39,6 +39,36 @@ class ApiService {
     client = RestAPIClient(_dio);
   }
 
+  // ================= BIOMETRIC / REGISTRATION APIS =================
+
+  /// Fetches the list of students waiting for face enrollment
+  Future<List<dynamic>> getPendingEnrollments() async {
+    try {
+      // Calling the client endpoint: public/pending-enrollment
+      final dynamic response = await client.getPendingEnrollments();
+      
+      // Postman data shows this is a direct list or inside 'data'
+      if (response is Map && response.containsKey('data')) {
+        return response['data'] as List<dynamic>;
+      } else if (response is List) {
+        return response;
+      }
+      return [];
+    } catch (e) {
+      print("Error fetching pending enrollments: $e");
+      return [];
+    }
+  }
+
+  /// Submits the 192-dimensional face vector to the server
+  Future<dynamic> submitEnrollment(int studentId, List<double> faceVector) async {
+    final payload = {
+      "student_id": studentId,
+      "face_vector": faceVector,
+    };
+    return await client.submitEnrollment(payload);
+  }
+
   // ================= PROFILE & AUTH APIS (DO NOT REMOVE) =================
   
   Future<dynamic> getProfile() => client.getProfile();
@@ -53,10 +83,7 @@ class ApiService {
 
   Future<List<dynamic>> getLeaves([int? userId]) async {
     try {
-      // We use 'dynamic' because the response is a Map: {"message": "...", "data": []}
       final dynamic response = await client.getLeaves();
-      
-      // Extract the 'data' list from the response object
       if (response is Map && response.containsKey('data')) {
         return response['data'] as List<dynamic>;
       } else if (response is List) {

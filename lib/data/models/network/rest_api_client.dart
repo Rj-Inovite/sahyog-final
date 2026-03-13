@@ -11,7 +11,16 @@ part 'rest_api_client.g.dart';
 abstract class RestAPIClient {
   factory RestAPIClient(Dio dio, {String? baseUrl}) = _RestAPIClient;
 
+  // ================= BIOMETRIC REGISTRATION APIS =================
+
+  @GET("public/pending-enrollment")
+  Future<dynamic> getPendingEnrollments();
+
+  @POST("attendance-enrollment")
+  Future<dynamic> submitEnrollment(@Body() Map<String, dynamic> body);
+
   // ================= AUTH & PROFILE =================
+  
   @POST("auth/login")
   Future<LoginResponse> login(@Body() Map<String, dynamic> body);
 
@@ -26,11 +35,9 @@ abstract class RestAPIClient {
 
   // ================= LEAVE APIS =================
   
-  // Note: Ensure this matches your Postman GET request path (e.g., "leaves" or "leaves/list")
   @GET("leaves")
   Future<dynamic> getLeaves();
 
-  // FIX: Added "/apply" to match your Postman screenshot successfully
   @POST("leaves/apply")
   Future<LeaveResponse> applyLeave(@Body() Map<String, dynamic> body);
 
@@ -38,6 +45,7 @@ abstract class RestAPIClient {
   Future<void> cancelLeave(@Path("id") int id);
 
   // ================= CHAT APIS =================
+  
   @POST("chat/setup")
   Future<ConversationResponse> setupConversation(@Body() Map<String, dynamic> body);
 

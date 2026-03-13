@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
 
-// Ensure these utility files exist in your project as per previous steps
+// Ensure these utility files exist in your project
 import 'ml_service.dart';
 import 'face_recognition_service.dart';
 import 'screens/utils/camera_utils.dart';
@@ -23,7 +24,26 @@ class StudentRecord {
   });
 }
 
-// Global list to store multiple registrations temporarily (In-Memory Database)
+// Model for API Data (Pending Enrollment)
+class PendingStudent {
+  final int id;
+  final int userId;
+  final String? educationalInstitute;
+  final String? courseName;
+  final String status;
+
+  PendingStudent({
+    required this.id,
+    required this.userId,
+    this.educationalInstitute,
+    this.courseName,
+    required this.status,
+  });
+
+  String get displayName => educationalInstitute ?? "Student ID: $id";
+}
+
+// Global list to store multiple registrations temporarily
 List<StudentRecord> globalStudentDatabase = [];
 
 class RegisterStudent extends StatefulWidget {
@@ -38,6 +58,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
   CameraController? _controller;
   final MLService _mlService = MLService();
   final FaceRecognitionService _faceService = FaceRecognitionService();
+  final TextEditingController _searchController = TextEditingController();
 
   // --- State Variables ---
   bool _isCameraOpen = false;
@@ -46,6 +67,19 @@ class _RegisterStudentState extends State<RegisterStudent> {
   bool isBusy = false;
   bool _isAngleCorrect = false; 
   List<double>? _finalVector;
+
+  // Data from your API response
+  final List<PendingStudent> _pendingEnrollments = [
+    PendingStudent(id: 27, userId: 63, educationalInstitute: "luytdsxhc", courseName: "bca", status: "active"),
+    PendingStudent(id: 24, userId: 58, educationalInstitute: "P.R. Pote Patil", courseName: "B.Tech Civil", status: "active"),
+    PendingStudent(id: 25, userId: 60, educationalInstitute: "Vidyabharti Mahavidyalaya", courseName: "B.Sc Physics", status: "active"),
+    PendingStudent(id: 22, userId: 54, educationalInstitute: "COETA Akola", courseName: "B.E. Mechanical", status: "active"),
+    PendingStudent(id: 23, userId: 56, educationalInstitute: "Shri Shivaji College", courseName: "B.Com", status: "active"),
+    PendingStudent(id: 21, userId: 52, educationalInstitute: "College of Engineering & Technology, Akola", courseName: "B.Tech IT", status: "active"),
+    PendingStudent(id: 18, userId: 46, educationalInstitute: "P.R. Pote Patil COE&T", courseName: "B.Tech Computer Science", status: "active"),
+  ];
+
+  List<PendingStudent> _filteredStudents = [];
 
   // Instructions for each of the 6 steps
   final List<String> instructions = [
@@ -61,6 +95,16 @@ class _RegisterStudentState extends State<RegisterStudent> {
   void initState() {
     super.initState();
     _faceService.loadModel();
+    _filteredStudents = _pendingEnrollments; // Initialize list
+  }
+
+  // --- Search Filter Logic ---
+  void _filterSearch(String query) {
+    setState(() {
+      _filteredStudents = _pendingEnrollments
+          .where((s) => s.displayName.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
   }
 
   // --- Step 1: Start the Camera ---
@@ -68,7 +112,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
     if (_studentName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Action Required: Please enter the student's name."),
+          content: Text("Action Required: Please select a student from the list."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -175,8 +219,12 @@ class _RegisterStudentState extends State<RegisterStudent> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        // PREVIOUS PAGE BUTTON
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
-          // VIEW DATA BUTTON
           IconButton(
             icon: const Icon(Icons.list_alt_rounded, color: Colors.blueAccent, size: 28),
             onPressed: () {
@@ -191,42 +239,85 @@ class _RegisterStudentState extends State<RegisterStudent> {
   }
 
   Widget _buildInitialForm() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FadeInDown(child: const Icon(Icons.person_add_alt_1, size: 100, color: Colors.blueAccent)),
-          const SizedBox(height: 20),
-          const Text("New Enrollment", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const Text("Capture biometric data for the hostel database", style: TextStyle(color: Colors.grey, fontSize: 13)),
-          const SizedBox(height: 50),
-          TextField(
-            onChanged: (val) => _studentName = val,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              labelText: "Full Name of Student",
-              prefixIcon: const Icon(Icons.badge_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-              filled: true,
-              fillColor: Colors.grey[50],
-            ),
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            height: 65,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                elevation: 5,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+        child: Column(
+          children: [
+            FadeInDown(child: const Icon(Icons.face_retouching_natural_rounded, size: 80, color: Colors.blueAccent)),
+            const SizedBox(height: 15),
+            const Text("Biometric Enrollment", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            const Text("Select a student to begin face scanning", style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 30),
+
+            // SEARCHABLE DROPDOWN CONTAINER
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, spreadRadius: 2)],
               ),
-              onPressed: _startCamera,
-              child: const Text("LAUNCH SCANNER", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    onChanged: _filterSearch,
+                    decoration: InputDecoration(
+                      hintText: "Search student or institute...",
+                      prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  SizedBox(
+                    height: 250,
+                    child: ListView.builder(
+                      itemCount: _filteredStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = _filteredStudents[index];
+                        bool isSelected = _studentName == student.displayName;
+                        return ListTile(
+                          onTap: () {
+                            setState(() {
+                              _studentName = student.displayName;
+                              _searchController.text = student.displayName;
+                            });
+                          },
+                          leading: CircleAvatar(
+                            backgroundColor: isSelected ? Colors.blueAccent : Colors.grey[200],
+                            child: Icon(Icons.person, color: isSelected ? Colors.white : Colors.grey),
+                          ),
+                          title: Text(student.educationalInstitute ?? "Unknown", 
+                            style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.blueAccent : Colors.black87)
+                          ),
+                          subtitle: Text("ID: ${student.id} | Course: ${student.courseName ?? 'N/A'}", style: const TextStyle(fontSize: 11)),
+                          trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.blueAccent) : null,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )
-        ],
+
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              height: 65,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 5,
+                ),
+                onPressed: _startCamera,
+                child: const Text("START FACE SCANNER", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -312,48 +403,32 @@ class _RegisterStudentState extends State<RegisterStudent> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 80),
-              const SizedBox(height: 20),
-              Text("Registered: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-              const Text("Your face has been successfully registered!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-              const Divider(height: 40),
-              const Align(alignment: Alignment.centerLeft, child: Text(" VECTOR CODE:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueAccent))),
-              const SizedBox(height: 10),
-              Container(
-                height: 150,
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(15)),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    _finalVector.toString(),
-                    style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.black87),
-                  ),
-                ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 80),
+            const SizedBox(height: 20),
+            Text("Registered: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+            const Text("Data has been successfully saved!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const Divider(height: 40),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _isCameraOpen = false;
-                    currentStep = 0;
-                    _studentName = "";
-                  });
-                },
-                child: const Text("DONE & RETURN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              )
-            ],
-          ),
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() {
+                  _isCameraOpen = false;
+                  currentStep = 0;
+                  _studentName = "";
+                  _searchController.clear();
+                });
+              },
+              child: const Text("DONE & RETURN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            )
+          ],
         ),
       ),
     );
@@ -362,11 +437,12 @@ class _RegisterStudentState extends State<RegisterStudent> {
   @override
   void dispose() {
     _controller?.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 }
 
-// --- NEW ELABORATED DATA VIEW SCREEN ---
+// --- DATA VIEW SCREEN ---
 
 class DataViewScreen extends StatefulWidget {
   const DataViewScreen({super.key});
@@ -384,18 +460,13 @@ class _DataViewScreenState extends State<DataViewScreen> {
     DateTime now = DateTime.now();
     return globalStudentDatabase.where((student) {
       bool yearMatch = student.registrationDate.year == selectedYear;
-      
       if (selectedFilter == "Year") return yearMatch;
-      
       if (selectedFilter == "Month") {
         return yearMatch && DateFormat('MMMM').format(student.registrationDate) == selectedMonth;
       }
-      
       if (selectedFilter == "Week") {
-        // Matches current week (last 7 days) if no other filter is manually moved
         return student.registrationDate.isAfter(now.subtract(const Duration(days: 7)));
       }
-      
       return false;
     }).toList();
   }
@@ -403,102 +474,38 @@ class _DataViewScreenState extends State<DataViewScreen> {
   @override
   Widget build(BuildContext context) {
     List<StudentRecord> filteredList = getFilteredData();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text("Registered Students", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => Navigator.pop(context)),
       ),
       body: Column(
         children: [
-          // Filter Section
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: ["Week", "Month", "Year"].map((filter) {
-                    return ChoiceChip(
-                      label: Text(filter),
-                      selected: selectedFilter == filter,
-                      selectedColor: Colors.blueAccent,
-                      labelStyle: TextStyle(color: selectedFilter == filter ? Colors.white : Colors.black),
-                      onSelected: (val) => setState(() => selectedFilter = filter),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: selectedYear,
-                        decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
-                        items: [2024, 2025, 2026].map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
-                        onChanged: (v) => setState(() => selectedYear = v!),
-                      ),
-                    ),
-                    if (selectedFilter == "Month") const SizedBox(width: 10),
-                    if (selectedFilter == "Month")
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selectedMonth,
-                          decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
-                          items: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-                              .map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                          onChanged: (v) => setState(() => selectedMonth = v!),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: ["Week", "Month", "Year"].map((filter) => ChoiceChip(
+                label: Text(filter),
+                selected: selectedFilter == filter,
+                onSelected: (val) => setState(() => selectedFilter = filter),
+              )).toList(),
             ),
           ),
-          const Divider(),
-          // Data List
           Expanded(
             child: filteredList.isEmpty
-                ? const Center(child: Text("No records found for this selection"))
+                ? const Center(child: Text("No records found"))
                 : ListView.builder(
                     itemCount: filteredList.length,
                     itemBuilder: (context, index) {
                       final student = filteredList[index];
-                      return FadeInLeft(
-                        child: Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          child: ListTile(
-                            leading: const CircleAvatar(backgroundColor: Colors.blueAccent, child: Icon(Icons.person, color: Colors.white)),
-                            title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text("Date: ${DateFormat('dd MMM yyyy').format(student.registrationDate)}"),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              // View Individual Vector details
-                              showModalBottomSheet(
-                                context: context,
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-                                builder: (c) => Padding(
-                                  padding: const EdgeInsets.all(25),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text("${student.name}'s Profile", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 15),
-                                      const Text("Stored Vector Data:", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                                      const SizedBox(height: 10),
-                                      Expanded(child: SingleChildScrollView(child: Text(student.vector.toString(), style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                      return ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.person)),
+                        title: Text(student.name),
+                        subtitle: Text(DateFormat('dd MMM yyyy').format(student.registrationDate)),
                       );
                     },
                   ),

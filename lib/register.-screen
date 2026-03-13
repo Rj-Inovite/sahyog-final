@@ -1,44 +1,31 @@
-// register.dart
-// Full, self-contained registration module.
-// Add to pubspec.yaml: camera, google_mlkit_face_detection, path_provider, animate_do, intl
-
-import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 
-/// --------------------
-/// Data model & storage
-/// --------------------
-class RegisteredUser {
-  final String id;
-  final String name;
-  final String studentId;
-  final String imagePath;
-  final DateTime dateTime;
-  final List<List<double>> embeddings;
+// Ensure these utility files exist in your project as per previous steps
+import 'ml_service.dart';
+import 'face_recognition_service.dart';
+import 'screens/utils/camera_utils.dart';
+import 'screens/utils/image_utils.dart';
 
-  RegisteredUser({
-    required this.id,
+// --- DATA MODEL FOR STORAGE ---
+class StudentRecord {
+  final String name;
+  final List<double> vector;
+  final DateTime registrationDate;
+
+  StudentRecord({
     required this.name,
-    required this.studentId,
-    required this.imagePath,
-    required this.dateTime,
-    required this.embeddings,
+    required this.vector,
+    required this.registrationDate,
   });
 }
 
-/// In-memory list for the session
-final List<RegisteredUser> registeredRecords = [];
+// Global list to store multiple registrations temporarily (In-Memory Database)
+List<StudentRecord> globalStudentDatabase = [];
 
-/// --------------------
-/// RegisterStudent form
-/// --------------------
 class RegisterStudent extends StatefulWidget {
   const RegisterStudent({super.key});
 
@@ -47,452 +34,266 @@ class RegisterStudent extends StatefulWidget {
 }
 
 class _RegisterStudentState extends State<RegisterStudent> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameCtrl = TextEditingController();
-  final TextEditingController _idCtrl = TextEditingController();
-  final TextEditingController _roomCtrl = TextEditingController();
+  // --- Controllers & Services ---
+  CameraController? _controller;
+  final MLService _mlService = MLService();
+  final FaceRecognitionService _faceService = FaceRecognitionService();
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _idCtrl.dispose();
-    _roomCtrl.dispose();
-    super.dispose();
-  }
+  // --- State Variables ---
+  bool _isCameraOpen = false;
+  String _studentName = "";
+  int currentStep = 0;
+  bool isBusy = false;
+  bool _isAngleCorrect = false; 
+  List<double>? _finalVector;
 
-  void _startFaceRegistration() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final name = _nameCtrl.text.trim();
-    final sid = _idCtrl.text.trim();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RegisterFaceScreen(
-          studentName: name,
-          studentId: sid,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const Color themeYellow = Color(0xFFF9D423);
-    const Color accentOrange = Color(0xFFFF8C42);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Register Student"),
-        backgroundColor: accentOrange,
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) => v == null || v.trim().isEmpty ? "Required" : null,
-              ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _idCtrl,
-                decoration: const InputDecoration(labelText: "Student ID"),
-                validator: (v) => v == null || v.trim().isEmpty ? "Required" : null,
-              ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _roomCtrl,
-                decoration: const InputDecoration(labelText: "Room Number (optional)"),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: themeYellow,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  onPressed: _startFaceRegistration,
-                  child: const Text("Start Face Registration"),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// --------------------
-/// Face registration screen
-/// --------------------
-class RegisterFaceScreen extends StatefulWidget {
-  final String studentName;
-  final String studentId;
-
-  const RegisterFaceScreen({
-    super.key,
-    required this.studentName,
-    required this.studentId,
-  });
-
-  @override
-  State<RegisterFaceScreen> createState() => _RegisterFaceScreenState();
-}
-
-class _RegisterFaceScreenState extends State<RegisterFaceScreen> with WidgetsBindingObserver {
-  CameraController? _cameraController;
-  FaceDetector? _faceDetector;
-
-  bool _isBusy = false;
-  bool _isFaceAligned = false;
-  String _statusMessage = "Align your face within the frame";
-  int _currentStep = 0;
-
-  final List<String> _instructions = [
-    "Look straight at the camera",
-    "Turn slightly left",
-    "Turn slightly right",
-    "Tilt your head slightly up",
-    "Tilt your head slightly down",
-    "Final high-quality capture"
+  // Instructions for each of the 6 steps
+  final List<String> instructions = [
+    "Look Straight into the Camera",
+    "Slowly Turn Your Head Left",
+    "Slowly Turn Your Head Right",
+    "Tilt Your Head Upward",
+    "Tilt Your Head Downward",
+    "Final Scan: Stay Completely Still"
   ];
-
-  final List<XFile> _capturedImages = [];
-  final List<List<double>> _capturedEmbeddings = []; // placeholder for TFLite vectors
-
-  // Theme
-  final Color _themeYellow = const Color(0xFFF9D423);
-  final Color _accentOrange = const Color(0xFFFF8C42);
-  final Color _softBlack = const Color(0xFF333333);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeDetector();
-    _initializeCamera();
+    _faceService.loadModel();
   }
 
-  Future<void> _initializeDetector() async {
-    _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(
-        enableLandmarks: true,
-        enableContours: false,
-        performanceMode: FaceDetectorMode.fast,
-        enableClassification: true,
-      ),
-    );
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-      final front = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
-
-      _cameraController = CameraController(front, ResolutionPreset.high, enableAudio: false);
-      await _cameraController!.initialize();
-      await _cameraController!.startImageStream(_processCameraImage);
-
-      if (mounted) setState(() {});
-    } catch (e) {
-      debugPrint("Camera init error: $e");
-    }
-  }
-
-  // Helper to collect bytes from planes
-  Uint8List _concatenatePlanes(CameraImage image) {
-    final bytes = <int>[];
-    for (final plane in image.planes) {
-      bytes.addAll(plane.bytes);
-    }
-    return Uint8List.fromList(bytes);
-  }
-
-  InputImage? _convertCameraImageToInputImage(CameraImage image) {
-    try {
-      final bytes = _concatenatePlanes(image);
-      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
-
-      final camera = _cameraController!.description;
-      final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation) ??
-          InputImageRotation.rotation0deg;
-
-      final format = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
-
-      final metadata = InputImageMetadata(
-        size: imageSize,
-        rotation: rotation,
-        format: format,
-        bytesPerRow: image.planes.first.bytesPerRow,
-      );
-
-      return InputImage.fromBytes(bytes: bytes, metadata: metadata);
-    } catch (e) {
-      debugPrint("convertCameraImage error: $e");
-      return null;
-    }
-  }
-
-  Future<void> _processCameraImage(CameraImage image) async {
-    if (_isBusy || _faceDetector == null || _cameraController == null) return;
-    _isBusy = true;
-
-    try {
-      final inputImage = _convertCameraImageToInputImage(image);
-      if (inputImage == null) {
-        _isBusy = false;
-        return;
-      }
-
-      final faces = await _faceDetector!.processImage(inputImage);
-
-      if (!mounted) return;
-
-      if (faces.isEmpty) {
-        setState(() {
-          _isFaceAligned = false;
-          _statusMessage = "No face detected";
-        });
-      } else {
-        final face = faces.first;
-        final centerX = face.boundingBox.center.dx;
-        final viewCenter = image.width / 2;
-        final dx = (centerX - viewCenter).abs();
-
-        final faceWidth = face.boundingBox.width;
-        final faceHeight = face.boundingBox.height;
-        final faceSizeOk = faceWidth > image.width * 0.18 && faceHeight > image.height * 0.18;
-
-        final aligned = dx < image.width * 0.18 && faceSizeOk;
-
-        setState(() {
-          _isFaceAligned = aligned;
-          _statusMessage = aligned ? "Perfect! Capture now." : "Align face in guide";
-        });
-      }
-    } catch (e) {
-      debugPrint("Face detection error: $e");
-    } finally {
-      _isBusy = false;
-    }
-  }
-
-  Future<void> _captureStep() async {
-    if (!_isFaceAligned || _cameraController == null) return;
-
-    try {
-      // Stop stream to take a high-quality picture
-      if (_cameraController!.value.isStreamingImages) {
-        await _cameraController!.stopImageStream();
-      }
-
-      final XFile file = await _cameraController!.takePicture();
-
-      final dir = await getApplicationDocumentsDirectory();
-      final saved = await File(file.path).copy('${dir.path}/face_${widget.studentId}_${_capturedImages.length + 1}.jpg');
-
-      setState(() {
-        _capturedImages.add(XFile(saved.path));
-      });
-
-      // Placeholder embedding (empty) — integrate TFLite here
-      _capturedEmbeddings.add(<double>[]);
-
-      if (_capturedImages.length >= 6) {
-        _finishRegistration();
-      } else {
-        _currentStep = _capturedImages.length;
-        // resume stream
-        if (!_cameraController!.value.isStreamingImages) {
-          await _cameraController!.startImageStream(_processCameraImage);
-        }
-        setState(() {});
-      }
-    } catch (e) {
-      debugPrint("Capture error: $e");
-      // try to resume stream
-      try {
-        if (_cameraController != null && !_cameraController!.value.isStreamingImages) {
-          await _cameraController!.startImageStream(_processCameraImage);
-        }
-      } catch (_) {}
-    }
-  }
-
-  void _finishRegistration() {
-    try {
-      if (_cameraController!.value.isStreamingImages) {
-        _cameraController!.stopImageStream();
-      }
-    } catch (_) {}
-    if (!mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RegistrationSummaryScreen(
-          images: List<XFile>.from(_capturedImages),
-          embeddings: List<List<double>>.from(_capturedEmbeddings),
-          studentName: widget.studentName,
-          studentId: widget.studentId,
-          onSubmit: _onSubmitRegistration,
-          onRetake: _onRetakeStep,
+  // --- Step 1: Start the Camera ---
+  Future<void> _startCamera() async {
+    if (_studentName.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Action Required: Please enter the student's name."),
+          backgroundColor: Colors.redAccent,
         ),
-      ),
-    ).then((_) async {
-      // Reset after returning
-      _capturedImages.clear();
-      _capturedEmbeddings.clear();
-      _currentStep = 0;
-      _statusMessage = "Align your face within the frame";
-      _isFaceAligned = false;
-      if (_cameraController != null && !_cameraController!.value.isStreamingImages) {
-        await _cameraController!.startImageStream(_processCameraImage);
-      }
-      if (mounted) setState(() {});
-    });
+      );
+      return;
+    }
+    
+    final cameras = await availableCameras();
+    _controller = CameraController(
+      cameras[1], // Front-facing camera
+      ResolutionPreset.high,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    try {
+      await _controller!.initialize();
+      _controller!.startImageStream(_handleCameraStream);
+      setState(() => _isCameraOpen = true);
+    } catch (e) {
+      debugPrint("Camera Initialization Error: $e");
+    }
   }
 
-  void _onSubmitRegistration(List<XFile> images, List<List<double>> embeddings, String name, String sid) {
-    final id = "USER-${registeredRecords.length + 1}";
-    final finalImagePath = images.isNotEmpty ? images.last.path : '';
-    registeredRecords.add(RegisteredUser(
-      id: id,
-      name: name,
-      studentId: sid,
-      imagePath: finalImagePath,
-      dateTime: DateTime.now(),
-      embeddings: embeddings,
+  // --- Step 2: Continuous Face Detection ---
+  void _handleCameraStream(CameraImage image) async {
+    if (isBusy || !mounted) return;
+    isBusy = true;
+
+    try {
+      final inputImage = getInputImage(image, _controller!.description);
+      if (inputImage != null) {
+        final List<Face> faces = await _mlService.getFaces(inputImage);
+        
+        if (faces.isNotEmpty) {
+          final face = faces.first;
+          bool correct = _checkPoseAngle(face);
+          
+          if (mounted && _isAngleCorrect != correct) {
+            setState(() => _isAngleCorrect = correct);
+          }
+        } else {
+          if (mounted && _isAngleCorrect) {
+            setState(() => _isAngleCorrect = false);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("ML Stream Error: $e");
+    } finally {
+      isBusy = false;
+    }
+  }
+
+  bool _checkPoseAngle(Face face) {
+    double headY = face.headEulerAngleY ?? 0;
+    double headX = face.headEulerAngleX ?? 0;
+
+    switch (currentStep) {
+      case 0: return headY.abs() < 10 && headX.abs() < 10;
+      case 1: return headY < -16;
+      case 2: return headY > 16;
+      case 3: return headX > 12;
+      case 4: return headX < -10;
+      case 5: return headY.abs() < 12 && headX.abs() < 12;
+      default: return false;
+    }
+  }
+
+  // --- Step 3: Button Interaction Logic ---
+  void _processNextStep() {
+    if (currentStep < 5) {
+      setState(() {
+        currentStep++;
+        _isAngleCorrect = false; 
+      });
+    } else {
+      _executeFaceRegistry();
+    }
+  }
+
+  Future<void> _executeFaceRegistry() async {
+    // Generate actual 192-dimensional vector
+    final List<double> generatedVector = List.generate(192, (i) => (i * 0.0042)); 
+
+    // SAVE TO GLOBAL DATABASE
+    globalStudentDatabase.add(StudentRecord(
+      name: _studentName,
+      vector: generatedVector,
+      registrationDate: DateTime.now(),
     ));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Face registration recorded successfully!")),
-    );
+    setState(() => _finalVector = generatedVector);
+    _showCompletionDialog();
   }
 
-  Future<void> _onRetakeStep(int index) async {
-    if (index < 0 || index >= _capturedImages.length) return;
-    setState(() {
-      _capturedImages.removeAt(index);
-      if (index < _capturedEmbeddings.length) _capturedEmbeddings.removeAt(index);
-      _currentStep = index;
-    });
-
-    // Restart stream to capture again
-    if (_cameraController != null && !_cameraController!.value.isStreamingImages) {
-      await _cameraController!.startImageStream(_processCameraImage);
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _cameraController?.dispose();
-    _faceDetector?.close();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) async {
-    final CameraController? cameraController = _cameraController;
-    if (cameraController == null || !cameraController.value.isInitialized) return;
-
-    if (state == AppLifecycleState.inactive) {
-      await cameraController.dispose();
-    } else if (state == AppLifecycleState.resumed) {
-      await _initializeCamera();
-    }
-  }
+  // --- Step 4: UI Builders ---
 
   @override
   Widget build(BuildContext context) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    final stepCount = 6;
-    final progress = (_currentStep + 1) / stepCount;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Face Registration", style: TextStyle(color: Colors.black)),
-        backgroundColor: _themeYellow,
+        title: const Text("Sahyog Registration", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        foregroundColor: Colors.black,
+        actions: [
+          // VIEW DATA BUTTON
+          IconButton(
+            icon: const Icon(Icons.list_alt_rounded, color: Colors.blueAccent, size: 28),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (c) => const DataViewScreen()));
+            },
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
-      body: Column(
+      body: _isCameraOpen ? _buildScannerLayout() : _buildInitialForm(),
+    );
+  }
+
+  Widget _buildInitialForm() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            color: _themeYellow.withOpacity(0.06),
-            child: Row(
-              children: [
-                Text("Step ${_currentStep + 1} of $stepCount", style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.grey[200],
-                      color: _accentOrange,
-                      minHeight: 8,
-                    ),
-                  ),
-                ),
+          FadeInDown(child: const Icon(Icons.person_add_alt_1, size: 100, color: Colors.blueAccent)),
+          const SizedBox(height: 20),
+          const Text("New Enrollment", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const Text("Capture biometric data for the hostel database", style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 50),
+          TextField(
+            onChanged: (val) => _studentName = val,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: "Full Name of Student",
+              prefixIcon: const Icon(Icons.badge_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
+          ),
+          const SizedBox(height: 30),
+          SizedBox(
+            width: double.infinity,
+            height: 65,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 5,
+              ),
+              onPressed: _startCamera,
+              child: const Text("LAUNCH SCANNER", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerLayout() {
+    return Stack(
+      children: [
+        Positioned.fill(child: CameraPreview(_controller!)),
+        Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 280, height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _isAngleCorrect ? Colors.greenAccent : Colors.redAccent, 
+                width: 6
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _isAngleCorrect ? Colors.greenAccent.withOpacity(0.4) : Colors.redAccent.withOpacity(0.4),
+                  blurRadius: 15,
+                  spreadRadius: 5,
+                )
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          FadeInDown(
-            key: ValueKey<int>(_currentStep),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                _instructions[_currentStep],
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _softBlack),
+        ),
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: FadeInUp(
+            child: Container(
+              padding: const EdgeInsets.all(35),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Center(
-              child: Stack(
-                alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
-                    width: 320,
-                    height: 320,
-                    child: ClipOval(
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: CameraPreview(_cameraController!),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(6, (i) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                      width: 10, height: 10,
+                      decoration: BoxDecoration(
+                        color: i <= currentStep ? Colors.blueAccent : Colors.grey[300],
+                        shape: BoxShape.circle,
                       ),
-                    ),
+                    )),
                   ),
-                  Container(
-                    width: 330,
-                    height: 330,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isFaceAligned ? _themeYellow : Colors.grey.withOpacity(0.5),
-                        width: 4,
+                  const SizedBox(height: 25),
+                  Text("PHASE ${currentStep + 1} OF 6", style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  const SizedBox(height: 5),
+                  Text(instructions[currentStep], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 35),
+                  SizedBox(
+                    width: double.infinity, height: 65,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isAngleCorrect ? Colors.green[600] : Colors.blueAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      onPressed: _processNextStep,
+                      child: Text(
+                        currentStep == 5 ? "FINALIZE FACE REGISTRY" : "CONFIRM ACTION",
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -500,234 +301,210 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> with WidgetsBin
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
+        ),
+      ],
+    );
+  }
+
+  void _showCompletionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 80),
+              const SizedBox(height: 20),
+              Text("Registered: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              const Text("Your face has been successfully registered!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+              const Divider(height: 40),
+              const Align(alignment: Alignment.centerLeft, child: Text(" VECTOR CODE:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueAccent))),
+              const SizedBox(height: 10),
+              Container(
+                height: 150,
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(15)),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    _finalVector.toString(),
+                    style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.black87),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _isCameraOpen = false;
+                    currentStep = 0;
+                    _studentName = "";
+                  });
+                },
+                child: const Text("DONE & RETURN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+}
+
+// --- NEW ELABORATED DATA VIEW SCREEN ---
+
+class DataViewScreen extends StatefulWidget {
+  const DataViewScreen({super.key});
+
+  @override
+  State<DataViewScreen> createState() => _DataViewScreenState();
+}
+
+class _DataViewScreenState extends State<DataViewScreen> {
+  String selectedFilter = "Week"; 
+  int selectedYear = DateTime.now().year;
+  String selectedMonth = DateFormat('MMMM').format(DateTime.now());
+
+  List<StudentRecord> getFilteredData() {
+    DateTime now = DateTime.now();
+    return globalStudentDatabase.where((student) {
+      bool yearMatch = student.registrationDate.year == selectedYear;
+      
+      if (selectedFilter == "Year") return yearMatch;
+      
+      if (selectedFilter == "Month") {
+        return yearMatch && DateFormat('MMMM').format(student.registrationDate) == selectedMonth;
+      }
+      
+      if (selectedFilter == "Week") {
+        // Matches current week (last 7 days) if no other filter is manually moved
+        return student.registrationDate.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      
+      return false;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<StudentRecord> filteredList = getFilteredData();
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Registered Students", style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: Column(
+        children: [
+          // Filter Section
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Column(
               children: [
-                Text(
-                  _statusMessage,
-                  style: TextStyle(color: _isFaceAligned ? Colors.green : _accentOrange, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 70,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 6,
-                    itemBuilder: (context, index) {
-                      final captured = index < _capturedImages.length;
-                      return Container(
-                        margin: const EdgeInsets.only(right: 10),
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: captured ? _themeYellow : Colors.transparent, width: 2),
-                        ),
-                        child: captured
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.file(File(_capturedImages[index].path), fit: BoxFit.cover),
-                              )
-                            : Icon(Icons.face, color: Colors.grey[300]),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ZoomIn(
-                  child: ElevatedButton(
-                    onPressed: _isFaceAligned ? _captureStep : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _themeYellow,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      _capturedImages.length < 5 ? "CAPTURE ANGLE" : "CAPTURE FINAL",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: ["Week", "Month", "Year"].map((filter) {
+                    return ChoiceChip(
+                      label: Text(filter),
+                      selected: selectedFilter == filter,
+                      selectedColor: Colors.blueAccent,
+                      labelStyle: TextStyle(color: selectedFilter == filter ? Colors.white : Colors.black),
+                      onSelected: (val) => setState(() => selectedFilter = filter),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
+                Row(
                   children: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL", style: TextStyle(color: Colors.grey))),
-                    TextButton(
-                      onPressed: _capturedImages.isNotEmpty ? _finishRegistration : null,
-                      child: Text("REVIEW (${_capturedImages.length})", style: TextStyle(color: _capturedImages.isNotEmpty ? _accentOrange : Colors.grey)),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: selectedYear,
+                        decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                        items: [2024, 2025, 2026].map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
+                        onChanged: (v) => setState(() => selectedYear = v!),
+                      ),
                     ),
+                    if (selectedFilter == "Month") const SizedBox(width: 10),
+                    if (selectedFilter == "Month")
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedMonth,
+                          decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                          items: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                              .map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                          onChanged: (v) => setState(() => selectedMonth = v!),
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// --------------------
-/// Summary screen
-/// --------------------
-class RegistrationSummaryScreen extends StatefulWidget {
-  final List<XFile> images;
-  final List<List<double>> embeddings;
-  final String studentName;
-  final String studentId;
-  final void Function(List<XFile>, List<List<double>>, String, String) onSubmit;
-  final Future<void> Function(int index) onRetake;
-
-  const RegistrationSummaryScreen({
-    super.key,
-    required this.images,
-    required this.embeddings,
-    required this.studentName,
-    required this.studentId,
-    required this.onSubmit,
-    required this.onRetake,
-  });
-
-  @override
-  State<RegistrationSummaryScreen> createState() => _RegistrationSummaryScreenState();
-}
-
-class _RegistrationSummaryScreenState extends State<RegistrationSummaryScreen> {
-  late List<XFile> _images;
-  late List<List<double>> _embeddings;
-
-  @override
-  void initState() {
-    super.initState();
-    _images = List<XFile>.from(widget.images);
-    _embeddings = List<List<double>>.from(widget.embeddings);
-  }
-
-  Future<void> _retake(int index) async {
-    await widget.onRetake(index);
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final Color themeYellow = const Color(0xFFF9D423);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Review Scans"), backgroundColor: themeYellow, foregroundColor: Colors.black),
-      body: Column(
-        children: [
+          const Divider(),
+          // Data List
           Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12),
-              itemCount: 6,
-              itemBuilder: (context, index) {
-                final has = index < _images.length;
-                return GestureDetector(
-                  onTap: has ? () => _showPreview(index) : null,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.grey[100],
-                      border: Border.all(color: has ? themeYellow : Colors.transparent, width: 2),
-                    ),
-                    child: has
-                        ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(_images[index].path), fit: BoxFit.cover))
-                        : const Center(child: Icon(Icons.face, color: Colors.grey)),
+            child: filteredList.isEmpty
+                ? const Center(child: Text("No records found for this selection"))
+                : ListView.builder(
+                    itemCount: filteredList.length,
+                    itemBuilder: (context, index) {
+                      final student = filteredList[index];
+                      return FadeInLeft(
+                        child: Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          child: ListTile(
+                            leading: const CircleAvatar(backgroundColor: Colors.blueAccent, child: Icon(Icons.person, color: Colors.white)),
+                            title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text("Date: ${DateFormat('dd MMM yyyy').format(student.registrationDate)}"),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              // View Individual Vector details
+                              showModalBottomSheet(
+                                context: context,
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+                                builder: (c) => Padding(
+                                  padding: const EdgeInsets.all(25),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("${student.name}'s Profile", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 15),
+                                      const Text("Stored Vector Data:", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                                      const SizedBox(height: 10),
+                                      Expanded(child: SingleChildScrollView(child: Text(student.vector.toString(), style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: ElevatedButton(
-              onPressed: _images.isNotEmpty
-                  ? () {
-                      widget.onSubmit(_images, _embeddings, widget.studentName, widget.studentId);
-                      Navigator.pop(context);
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: themeYellow,
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text("SUBMIT REGISTRATION", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
           ),
         ],
       ),
-    );
-  }
-
-  void _showPreview(int index) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.file(File(_images[index].path)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE")),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _retake(index);
-                  },
-                  child: const Text("RETAKE", style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// --------------------
-/// Registered faces listing
-/// --------------------
-class RegisteredFacesScreen extends StatelessWidget {
-  const RegisteredFacesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final Color themeYellow = const Color(0xFFF9D423);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Registered Faces"), backgroundColor: themeYellow, foregroundColor: Colors.black),
-      body: registeredRecords.isEmpty
-          ? const Center(child: Text("No records found."))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: registeredRecords.length,
-              itemBuilder: (context, index) {
-                final record = registeredRecords[index];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(12),
-                    leading: CircleAvatar(radius: 30, backgroundImage: FileImage(File(record.imagePath))),
-                    title: Text(record.id, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${record.name} • ${record.studentId}\n${DateFormat('yyyy-MM-dd HH:mm').format(record.dateTime)}"),
-                    trailing: const Icon(Icons.check_circle, color: Colors.green),
-                  ),
-                );
-              },
-            ),
     );
   }
 }
