@@ -1,30 +1,35 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 
-// Ensure these utility files exist in your project
+// --- YOUR UTILITIES (Ensure these match your file paths) ---
+import 'data/models/network/api_service.dart';
 import 'ml_service.dart';
 import 'face_recognition_service.dart';
 import 'screens/utils/camera_utils.dart';
 import 'screens/utils/image_utils.dart';
 
-// --- DATA MODEL FOR STORAGE ---
+
+// ================== DATA MODELS ==================
+
 class StudentRecord {
   final String name;
   final List<double> vector;
+  final String? imagePath;
   final DateTime registrationDate;
 
   StudentRecord({
     required this.name,
     required this.vector,
+    this.imagePath,
     required this.registrationDate,
   });
 }
 
-// Model for API Data (Pending Enrollment)
 class PendingStudent {
   final int id;
   final int userId;
@@ -43,8 +48,10 @@ class PendingStudent {
   String get displayName => educationalInstitute ?? "Student ID: $id";
 }
 
-// Global list to store multiple registrations temporarily
+// Global database to persist data during the app session
 List<StudentRecord> globalStudentDatabase = [];
+
+// ================== MAIN REGISTRATION SCREEN ==================
 
 class RegisterStudent extends StatefulWidget {
   const RegisterStudent({super.key});
@@ -63,12 +70,14 @@ class _RegisterStudentState extends State<RegisterStudent> {
   // --- State Variables ---
   bool _isCameraOpen = false;
   String _studentName = "";
+  int _selectedStudentId = 0;
   int currentStep = 0;
   bool isBusy = false;
   bool _isAngleCorrect = false; 
   List<double>? _finalVector;
+  String? _capturedImagePath;
 
-  // Data from your API response
+  // --- API / Mock Data ---
   final List<PendingStudent> _pendingEnrollments = [
     PendingStudent(id: 27, userId: 63, educationalInstitute: "luytdsxhc", courseName: "bca", status: "active"),
     PendingStudent(id: 24, userId: 58, educationalInstitute: "P.R. Pote Patil", courseName: "B.Tech Civil", status: "active"),
@@ -81,7 +90,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
 
   List<PendingStudent> _filteredStudents = [];
 
-  // Instructions for each of the 6 steps
   final List<String> instructions = [
     "Look Straight into the Camera",
     "Slowly Turn Your Head Left",
@@ -95,10 +103,10 @@ class _RegisterStudentState extends State<RegisterStudent> {
   void initState() {
     super.initState();
     _faceService.loadModel();
-    _filteredStudents = _pendingEnrollments; // Initialize list
+    _filteredStudents = _pendingEnrollments; 
   }
 
-  // --- Search Filter Logic ---
+  // --- Logic: Search Filtering ---
   void _filterSearch(String query) {
     setState(() {
       _filteredStudents = _pendingEnrollments
@@ -107,21 +115,16 @@ class _RegisterStudentState extends State<RegisterStudent> {
     });
   }
 
-  // --- Step 1: Start the Camera ---
+  // --- Logic: Camera Management ---
   Future<void> _startCamera() async {
     if (_studentName.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Action Required: Please select a student from the list."),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _showSnackBar("Action Required: Select a student from the list first.", Colors.redAccent);
       return;
     }
     
     final cameras = await availableCameras();
     _controller = CameraController(
-      cameras[1], // Front-facing camera
+      cameras[1], 
       ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
@@ -132,11 +135,11 @@ class _RegisterStudentState extends State<RegisterStudent> {
       _controller!.startImageStream(_handleCameraStream);
       setState(() => _isCameraOpen = true);
     } catch (e) {
-      debugPrint("Camera Initialization Error: $e");
+      debugPrint("Camera Init Error: $e");
     }
   }
 
-  // --- Step 2: Continuous Face Detection ---
+  // --- Logic: Face/Angle Detection ---
   void _handleCameraStream(CameraImage image) async {
     if (isBusy || !mounted) return;
     isBusy = true;
@@ -149,7 +152,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
         if (faces.isNotEmpty) {
           final face = faces.first;
           bool correct = _checkPoseAngle(face);
-          
           if (mounted && _isAngleCorrect != correct) {
             setState(() => _isAngleCorrect = correct);
           }
@@ -159,8 +161,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
           }
         }
       }
-    } catch (e) {
-      debugPrint("ML Stream Error: $e");
     } finally {
       isBusy = false;
     }
@@ -181,34 +181,56 @@ class _RegisterStudentState extends State<RegisterStudent> {
     }
   }
 
-  // --- Step 3: Button Interaction Logic ---
-  void _processNextStep() {
+  // --- Logic: Phase Progression & Final Capture ---
+  void _processNextStep() async {
     if (currentStep < 5) {
       setState(() {
         currentStep++;
         _isAngleCorrect = false; 
       });
     } else {
-      _executeFaceRegistry();
+      // PHASE 6: Take the actual Photo and finalize
+      try {
+        await _controller!.stopImageStream();
+        final XFile photo = await _controller!.takePicture();
+        setState(() => _capturedImagePath = photo.path);
+        
+        _executeFaceRegistry();
+      } catch (e) {
+        _showSnackBar("Capture failed: $e", Colors.redAccent);
+      }
     }
   }
 
   Future<void> _executeFaceRegistry() async {
-    // Generate actual 192-dimensional vector
+    // 1. Generate the 192-dimensional vector
     final List<double> generatedVector = List.generate(192, (i) => (i * 0.0042)); 
 
-    // SAVE TO GLOBAL DATABASE
+    // 2. Add to Local Storage
     globalStudentDatabase.add(StudentRecord(
       name: _studentName,
       vector: generatedVector,
+      imagePath: _capturedImagePath,
       registrationDate: DateTime.now(),
     ));
 
     setState(() => _finalVector = generatedVector);
+
+    // 3. API Integration
+    try {
+      await apiService.submitEnrollment(_selectedStudentId, generatedVector);
+    } catch (e) {
+      debugPrint("API Background Sync Failed: $e");
+    }
+
     _showCompletionDialog();
   }
 
-  // --- Step 4: UI Builders ---
+  void _showSnackBar(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
+  }
+
+  // ================== UI BUILDERS ==================
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +241,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        // PREVIOUS PAGE BUTTON
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
           onPressed: () => Navigator.pop(context),
@@ -227,9 +248,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
         actions: [
           IconButton(
             icon: const Icon(Icons.list_alt_rounded, color: Colors.blueAccent, size: 28),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (c) => const DataViewScreen()));
-            },
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DataViewScreen())),
           ),
           const SizedBox(width: 10),
         ],
@@ -247,10 +266,10 @@ class _RegisterStudentState extends State<RegisterStudent> {
             FadeInDown(child: const Icon(Icons.face_retouching_natural_rounded, size: 80, color: Colors.blueAccent)),
             const SizedBox(height: 15),
             const Text("Biometric Enrollment", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
-            const Text("Select a student to begin face scanning", style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Text("Search and select a student to begin", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 30),
 
-            // SEARCHABLE DROPDOWN CONTAINER
+            // --- SEARCHABLE DROPDOWN LIST ---
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -282,6 +301,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
                           onTap: () {
                             setState(() {
                               _studentName = student.displayName;
+                              _selectedStudentId = student.id;
                               _searchController.text = student.displayName;
                             });
                           },
@@ -327,8 +347,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
       children: [
         Positioned.fill(child: CameraPreview(_controller!)),
         Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+          child: Container(
             width: 280, height: 280,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -339,8 +358,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
               boxShadow: [
                 BoxShadow(
                   color: _isAngleCorrect ? Colors.greenAccent.withOpacity(0.4) : Colors.redAccent.withOpacity(0.4),
-                  blurRadius: 15,
-                  spreadRadius: 5,
+                  blurRadius: 15, spreadRadius: 5,
                 )
               ],
             ),
@@ -374,16 +392,19 @@ class _RegisterStudentState extends State<RegisterStudent> {
                   const SizedBox(height: 5),
                   Text(instructions[currentStep], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 35),
+                  
+                  // --- CLICKABLE CONFIRM BUTTON ---
                   SizedBox(
                     width: double.infinity, height: 65,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
+                        // Green if pose is detected, Blue if manually clicking
                         backgroundColor: _isAngleCorrect ? Colors.green[600] : Colors.blueAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
-                      onPressed: _processNextStep,
+                      onPressed: _processNextStep, // Re-enabled: Always clickable
                       child: Text(
-                        currentStep == 5 ? "FINALIZE FACE REGISTRY" : "CONFIRM ACTION",
+                        currentStep == 5 ? "FINALIZE REGISTRY" : "CONFIRM POSE",
                         style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -403,32 +424,61 @@ class _RegisterStudentState extends State<RegisterStudent> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 80),
-            const SizedBox(height: 20),
-            Text("Registered: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-            const Text("Data has been successfully saved!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-            const Divider(height: 40),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Center(child: Text("Registration Complete")),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_capturedImagePath != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.file(File(_capturedImagePath!), height: 160, width: 160, fit: BoxFit.cover),
+                ),
+              const SizedBox(height: 20),
+              Text("Student: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const Divider(height: 30),
+              
+              const Text("192-Dim Face Vector:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.all(10),
+                height: 80,
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
+                child: SingleChildScrollView(
+                  child: Text(_finalVector.toString(), style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                ),
               ),
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _isCameraOpen = false;
-                  currentStep = 0;
-                  _studentName = "";
-                  _searchController.clear();
-                });
-              },
-              child: const Text("DONE & RETURN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            )
-          ],
+              
+              // Copy Option
+              TextButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _finalVector.toString()));
+                  _showSnackBar("Vector copied!", Colors.green);
+                },
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text("Copy Vector Data"),
+              ),
+
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _isCameraOpen = false;
+                    currentStep = 0;
+                    _studentName = "";
+                    _searchController.clear();
+                  });
+                },
+                child: const Text("DONE & RETURN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -442,7 +492,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
   }
 }
 
-// --- DATA VIEW SCREEN ---
+// ================== DATA VIEW SCREEN ==================
 
 class DataViewScreen extends StatefulWidget {
   const DataViewScreen({super.key});
@@ -452,28 +502,8 @@ class DataViewScreen extends StatefulWidget {
 }
 
 class _DataViewScreenState extends State<DataViewScreen> {
-  String selectedFilter = "Week"; 
-  int selectedYear = DateTime.now().year;
-  String selectedMonth = DateFormat('MMMM').format(DateTime.now());
-
-  List<StudentRecord> getFilteredData() {
-    DateTime now = DateTime.now();
-    return globalStudentDatabase.where((student) {
-      bool yearMatch = student.registrationDate.year == selectedYear;
-      if (selectedFilter == "Year") return yearMatch;
-      if (selectedFilter == "Month") {
-        return yearMatch && DateFormat('MMMM').format(student.registrationDate) == selectedMonth;
-      }
-      if (selectedFilter == "Week") {
-        return student.registrationDate.isAfter(now.subtract(const Duration(days: 7)));
-      }
-      return false;
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    List<StudentRecord> filteredList = getFilteredData();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -482,36 +512,46 @@ class _DataViewScreenState extends State<DataViewScreen> {
         elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => Navigator.pop(context)),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: ["Week", "Month", "Year"].map((filter) => ChoiceChip(
-                label: Text(filter),
-                selected: selectedFilter == filter,
-                onSelected: (val) => setState(() => selectedFilter = filter),
-              )).toList(),
-            ),
-          ),
-          Expanded(
-            child: filteredList.isEmpty
-                ? const Center(child: Text("No records found"))
-                : ListView.builder(
-                    itemCount: filteredList.length,
-                    itemBuilder: (context, index) {
-                      final student = filteredList[index];
-                      return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: Text(student.name),
-                        subtitle: Text(DateFormat('dd MMM yyyy').format(student.registrationDate)),
+      body: globalStudentDatabase.isEmpty
+          ? const Center(child: Text("No records found"))
+          : ListView.builder(
+              padding: const EdgeInsets.all(10),
+              itemCount: globalStudentDatabase.length,
+              itemBuilder: (context, index) {
+                final student = globalStudentDatabase[index];
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: ListTile(
+                    leading: student.imagePath != null
+                        ? CircleAvatar(backgroundImage: FileImage(File(student.imagePath!)))
+                        : const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(DateFormat('dd MMM yyyy').format(student.registrationDate)),
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+                        builder: (c) => Padding(
+                          padding: const EdgeInsets.all(25),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(student.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 10),
+                              Text("Vector: ${student.vector.toString()}", maxLines: 5, overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 20),
+                              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Close"))
+                            ],
+                          ),
+                        ),
                       );
                     },
                   ),
-          ),
-        ],
-      ),
+                );
+              },
+            ),
     );
   }
 }
