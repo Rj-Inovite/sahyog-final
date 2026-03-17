@@ -6,8 +6,9 @@ import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 
-// --- YOUR UTILITIES (Ensure these match your file paths) ---
-import 'data/models/network/api_service.dart';
+// --- YOUR UTILITIES ---
+// Note: Ensure your path to api_service.dart is correct based on your folder structure
+import 'data/models/network/api_service.dart'; 
 import 'ml_service.dart';
 import 'face_recognition_service.dart';
 import 'screens/utils/camera_utils.dart';
@@ -33,6 +34,7 @@ class StudentRecord {
 class PendingStudent {
   final int id;
   final int userId;
+  final String studentName; 
   final String? educationalInstitute;
   final String? courseName;
   final String status;
@@ -40,15 +42,26 @@ class PendingStudent {
   PendingStudent({
     required this.id,
     required this.userId,
+    required this.studentName,
     this.educationalInstitute,
     this.courseName,
     required this.status,
   });
 
-  String get displayName => educationalInstitute ?? "Student ID: $id";
+  factory PendingStudent.fromJson(Map<String, dynamic> json) {
+    return PendingStudent(
+      id: json['id'],
+      userId: json['user_id'] ?? 0,
+      studentName: json['student_name'] ?? "Unknown Student",
+      educationalInstitute: json['educational_institute'],
+      courseName: json['course_name'],
+      status: json['status'] ?? "active",
+    );
+  }
+
+  String get displayName => studentName;
 }
 
-// Global database to persist data during the app session
 List<StudentRecord> globalStudentDatabase = [];
 
 // ================== MAIN REGISTRATION SCREEN ==================
@@ -61,13 +74,11 @@ class RegisterStudent extends StatefulWidget {
 }
 
 class _RegisterStudentState extends State<RegisterStudent> {
-  // --- Controllers & Services ---
   CameraController? _controller;
   final MLService _mlService = MLService();
   final FaceRecognitionService _faceService = FaceRecognitionService();
   final TextEditingController _searchController = TextEditingController();
 
-  // --- State Variables ---
   bool _isCameraOpen = false;
   String _studentName = "";
   int _selectedStudentId = 0;
@@ -77,18 +88,9 @@ class _RegisterStudentState extends State<RegisterStudent> {
   List<double>? _finalVector;
   String? _capturedImagePath;
 
-  // --- API / Mock Data ---
-  final List<PendingStudent> _pendingEnrollments = [
-    PendingStudent(id: 27, userId: 63, educationalInstitute: "luytdsxhc", courseName: "bca", status: "active"),
-    PendingStudent(id: 24, userId: 58, educationalInstitute: "P.R. Pote Patil", courseName: "B.Tech Civil", status: "active"),
-    PendingStudent(id: 25, userId: 60, educationalInstitute: "Vidyabharti Mahavidyalaya", courseName: "B.Sc Physics", status: "active"),
-    PendingStudent(id: 22, userId: 54, educationalInstitute: "COETA Akola", courseName: "B.E. Mechanical", status: "active"),
-    PendingStudent(id: 23, userId: 56, educationalInstitute: "Shri Shivaji College", courseName: "B.Com", status: "active"),
-    PendingStudent(id: 21, userId: 52, educationalInstitute: "College of Engineering & Technology, Akola", courseName: "B.Tech IT", status: "active"),
-    PendingStudent(id: 18, userId: 46, educationalInstitute: "P.R. Pote Patil COE&T", courseName: "B.Tech Computer Science", status: "active"),
-  ];
-
+  List<PendingStudent> _pendingEnrollments = [];
   List<PendingStudent> _filteredStudents = [];
+  bool _isLoadingApi = true;
 
   final List<String> instructions = [
     "Look Straight into the Camera",
@@ -103,22 +105,41 @@ class _RegisterStudentState extends State<RegisterStudent> {
   void initState() {
     super.initState();
     _faceService.loadModel();
-    _filteredStudents = _pendingEnrollments; 
+    _fetchStudentsFromApi(); 
   }
 
-  // --- Logic: Search Filtering ---
+  // --- Logic: Updated to use ApiService ---
+  Future<void> _fetchStudentsFromApi() async {
+    try {
+      setState(() => _isLoadingApi = true);
+      
+      // Using the centralized service instead of raw http calls
+      final List<dynamic> dataList = await apiService.getPendingEnrollments();
+      
+      setState(() {
+        _pendingEnrollments = dataList.map((s) => PendingStudent.fromJson(s)).toList();
+        _filteredStudents = _pendingEnrollments;
+        _isLoadingApi = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingApi = false);
+      _showSnackBar("Could not load pending enrollments", Colors.red);
+      debugPrint("API Fetch Error: $e");
+    }
+  }
+
   void _filterSearch(String query) {
     setState(() {
       _filteredStudents = _pendingEnrollments
-          .where((s) => s.displayName.toLowerCase().contains(query.toLowerCase()))
+          .where((s) => s.displayName.toLowerCase().contains(query.toLowerCase()) || 
+                        (s.educationalInstitute?.toLowerCase().contains(query.toLowerCase()) ?? false))
           .toList();
     });
   }
 
-  // --- Logic: Camera Management ---
   Future<void> _startCamera() async {
     if (_studentName.trim().isEmpty) {
-      _showSnackBar("Action Required: Select a student from the list first.", Colors.redAccent);
+      _showSnackBar("Select a student from the list first.", Colors.redAccent);
       return;
     }
     
@@ -139,7 +160,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
     }
   }
 
-  // --- Logic: Face/Angle Detection ---
   void _handleCameraStream(CameraImage image) async {
     if (isBusy || !mounted) return;
     isBusy = true;
@@ -181,7 +201,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
     }
   }
 
-  // --- Logic: Phase Progression & Final Capture ---
   void _processNextStep() async {
     if (currentStep < 5) {
       setState(() {
@@ -189,7 +208,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
         _isAngleCorrect = false; 
       });
     } else {
-      // PHASE 6: Take the actual Photo and finalize
       try {
         await _controller!.stopImageStream();
         final XFile photo = await _controller!.takePicture();
@@ -203,10 +221,9 @@ class _RegisterStudentState extends State<RegisterStudent> {
   }
 
   Future<void> _executeFaceRegistry() async {
-    // 1. Generate the 192-dimensional vector
+    // Note: In production, replace this dummy vector with real output from _faceService
     final List<double> generatedVector = List.generate(192, (i) => (i * 0.0042)); 
 
-    // 2. Add to Local Storage
     globalStudentDatabase.add(StudentRecord(
       name: _studentName,
       vector: generatedVector,
@@ -216,8 +233,8 @@ class _RegisterStudentState extends State<RegisterStudent> {
 
     setState(() => _finalVector = generatedVector);
 
-    // 3. API Integration
     try {
+      // Syncing with Web Panel
       await apiService.submitEnrollment(_selectedStudentId, generatedVector);
     } catch (e) {
       debugPrint("API Background Sync Failed: $e");
@@ -229,8 +246,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
   void _showSnackBar(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
   }
-
-  // ================== UI BUILDERS ==================
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +284,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
             const Text("Search and select a student to begin", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 30),
 
-            // --- SEARCHABLE DROPDOWN LIST ---
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -292,31 +306,36 @@ class _RegisterStudentState extends State<RegisterStudent> {
                   const Divider(height: 1),
                   SizedBox(
                     height: 250,
-                    child: ListView.builder(
-                      itemCount: _filteredStudents.length,
-                      itemBuilder: (context, index) {
-                        final student = _filteredStudents[index];
-                        bool isSelected = _studentName == student.displayName;
-                        return ListTile(
-                          onTap: () {
-                            setState(() {
-                              _studentName = student.displayName;
-                              _selectedStudentId = student.id;
-                              _searchController.text = student.displayName;
-                            });
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: isSelected ? Colors.blueAccent : Colors.grey[200],
-                            child: Icon(Icons.person, color: isSelected ? Colors.white : Colors.grey),
+                    child: _isLoadingApi 
+                      ? const Center(child: CircularProgressIndicator())
+                      : _filteredStudents.isEmpty 
+                        ? const Center(child: Text("No pending enrollments found"))
+                        : ListView.builder(
+                            itemCount: _filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = _filteredStudents[index];
+                              bool isSelected = _studentName == student.displayName;
+                              return ListTile(
+                                onTap: () {
+                                  setState(() {
+                                    _studentName = student.displayName;
+                                    _selectedStudentId = student.id;
+                                    _searchController.text = student.displayName;
+                                  });
+                                },
+                                leading: CircleAvatar(
+                                  backgroundColor: isSelected ? Colors.blueAccent : Colors.grey[200],
+                                  child: Icon(Icons.person, color: isSelected ? Colors.white : Colors.grey),
+                                ),
+                                title: Text(student.studentName, 
+                                  style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.blueAccent : Colors.black87)
+                                ),
+                                subtitle: Text("${student.educationalInstitute ?? 'N/A'}\nID: ${student.id} | Course: ${student.courseName ?? 'N/A'}", style: const TextStyle(fontSize: 11)),
+                                isThreeLine: true,
+                                trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.blueAccent) : null,
+                              );
+                            },
                           ),
-                          title: Text(student.educationalInstitute ?? "Unknown", 
-                            style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.blueAccent : Colors.black87)
-                          ),
-                          subtitle: Text("ID: ${student.id} | Course: ${student.courseName ?? 'N/A'}", style: const TextStyle(fontSize: 11)),
-                          trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.blueAccent) : null,
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -393,16 +412,14 @@ class _RegisterStudentState extends State<RegisterStudent> {
                   Text(instructions[currentStep], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 35),
                   
-                  // --- CLICKABLE CONFIRM BUTTON ---
                   SizedBox(
                     width: double.infinity, height: 65,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        // Green if pose is detected, Blue if manually clicking
                         backgroundColor: _isAngleCorrect ? Colors.green[600] : Colors.blueAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
-                      onPressed: _processNextStep, // Re-enabled: Always clickable
+                      onPressed: _processNextStep, 
                       child: Text(
                         currentStep == 5 ? "FINALIZE REGISTRY" : "CONFIRM POSE",
                         style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
@@ -449,7 +466,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
                 ),
               ),
               
-              // Copy Option
               TextButton.icon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _finalVector.toString()));
@@ -493,7 +509,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
 }
 
 // ================== DATA VIEW SCREEN ==================
-
 class DataViewScreen extends StatefulWidget {
   const DataViewScreen({super.key});
 

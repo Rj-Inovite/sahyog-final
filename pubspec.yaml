@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-
+ 
   # --- Machine Learning & Camera ---
   # Using 0.12.1+ for critical 16KB page alignment on Android 15+ (2026 standard)
   tflite_flutter: ^0.12.1 

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'rest_api_client.dart';
 import 'auth_local_storage.dart';
-import 'package:my_app/data/models/network/password_update_model.dart';
+import 'package:my_app/data/models/network/password_update_model.dart'; // Ensure this path is correct
 import 'package:flutter/material.dart';
 
 class AuthInterceptor extends Interceptor {
@@ -44,13 +44,11 @@ class ApiService {
     client = RestAPIClient(_dio);
   }
 
-  // ================= STUDENT PROFILE VIEW (NEW) =================
+  // ================= STUDENT PROFILE VIEW =================
 
   /// Fetches detailed student data from the web dashboard
-  /// Endpoint: GET student/view/{id}
   Future<dynamic> getStudentProfileView(int studentId) async {
     try {
-      // We call the client method we defined in Step 1
       final response = await client.getStudentView(studentId);
       return response; 
     } catch (e) {
@@ -59,20 +57,19 @@ class ApiService {
     }
   }
 
-  // ================= BIOMETRIC / REGISTRATION APIS =================
+  // ================= BIOMETRIC / REGISTRATION APIS (UPDATED) =================
 
-  Future<List<dynamic>> getPendingEnrollments() async {
+  /// Updated to return the full Map so register.dart can check ['success']
+  Future<Map<String, dynamic>> getPendingEnrollments() async {
     try {
       final response = await _dio.get("public/pending-enrollment");
-      if (response.data is Map && response.data.containsKey('data')) {
-        return response.data['data'] as List<dynamic>;
-      } else if (response.data is List) {
+      if (response.data is Map<String, dynamic>) {
         return response.data;
       }
-      return [];
+      return {"success": false, "data": []};
     } catch (e) {
       debugPrint("Error fetching pending enrollments: $e");
-      return [];
+      return {"success": false, "data": [], "error": e.toString()};
     }
   }
 

@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-// Model imports - ensure these paths match your project exactly
+// Ensure these paths match your project structure exactly
 import 'package:my_app/data/models/login_response.dart';
 import 'package:my_app/data/models/network/leave_response.dart';
-import 'package:my_app/data/models/network/conversation_model.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 
 part 'rest_api_client.g.dart';
@@ -15,7 +14,8 @@ abstract class RestAPIClient {
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 
-  /// Fetches students awaiting enrollment from the public endpoint
+  /// Fetches students awaiting enrollment
+  /// Returns the full Map: {"success": true, "data": [...]}
   @GET("public/pending-enrollment")
   Future<dynamic> getPendingEnrollments();
 
@@ -35,7 +35,7 @@ abstract class RestAPIClient {
   @GET("user/profile")
   Future<dynamic> getProfile();
 
-  // ✅ ADDED: Fetch detailed student view from Web Dashboard
+  /// Fetches detailed student view from Web Dashboard
   @GET("student/view/{id}")
   Future<dynamic> getStudentView(@Path("id") int id);
 
