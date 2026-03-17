@@ -5,12 +5,20 @@ import 'package:retrofit/retrofit.dart';
 import 'package:my_app/data/models/login_response.dart';
 import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
+// ADD THIS IMPORT (Ensure the filename matches what you created in Step 1)
+import 'package:my_app/data/models/network/student_list_response.dart';
 
 part 'rest_api_client.g.dart';
 
 @RestApi(baseUrl: "https://devsahyog.myakola.com/api/")
 abstract class RestAPIClient {
   factory RestAPIClient(Dio dio, {String? baseUrl}) = _RestAPIClient;
+
+  // ================= MANAGER / WARDEN APIS =================
+
+  /// Fetches the list of students for the manager/warden
+  @GET("manager/student-list")
+  Future<StudentListResponse> getStudentList();
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 

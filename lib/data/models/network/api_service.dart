@@ -1,9 +1,13 @@
 // ignore_for_file: use_build_context_synchronously
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:my_app/data/models/warden_list_response.dart';
 import 'rest_api_client.dart';
 import 'auth_local_storage.dart';
-import 'package:my_app/data/models/network/password_update_model.dart'; // Ensure this path is correct
+import 'package:my_app/data/models/network/password_update_model.dart';
+import 'package:my_app/data/models/network/student_list_response.dart'; 
+// Add the import for your new Warden model here
+
 import 'package:flutter/material.dart';
 
 class AuthInterceptor extends Interceptor {
@@ -42,6 +46,35 @@ class ApiService {
     ));
 
     client = RestAPIClient(_dio);
+  }
+
+  // ================= MANAGER APIS =================
+
+  /// Fetches the list of students for the warden/manager
+  Future<StudentListResponse?> getStudentList() async {
+    try {
+      return await client.getStudentList();
+    } catch (e) {
+      debugPrint("Error fetching Student List: $e");
+      return null;
+    }
+  }
+
+  // --- NEW: WARDEN LIST API (Staff Management) ---
+  /// Fetches the list of wardens/staff. 
+  /// Note: As requested, this specifically targets the wardens endpoint.
+  Future<WardenListResponse?> getWardenList() async {
+    try {
+      // Calling via _dio directly to handle the response body you provided
+      final response = await _dio.get("wardens");
+      if (response.data != null) {
+        return WardenListResponse.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching Warden List: $e");
+      return null;
+    }
   }
 
   // ================= STUDENT PROFILE VIEW =================

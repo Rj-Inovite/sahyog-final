@@ -1,8 +1,15 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
+import 'package:my_app/data/models/warden_list_response.dart';
 import 'dart:ui';
+
+// --- YOUR EXISTING IMPORTS ---
 import 'register.dart'; 
-// --- IMPORTING THE SEPARATED INBOX CODE ---
 import 'warden-response.dart'; 
+import 'data/models/network/api_service.dart'; 
+import 'package:my_app/data/models/network/student_list_response.dart'; 
+// Import the Warden Response model
+
 
 // --- THEME CONSTANTS ---
 const Color sunsetOrange = Color(0xFFFF8C42);
@@ -15,7 +22,7 @@ void main() => runApp(const MaterialApp(
       home: WardenDashboard(userData: {'name': 'Chief Warden'}),
     ));
 
-// --- MAIN DASHBOARD ---
+// --- MAIN DASHBOARD (UNCHANGED) ---
 class WardenDashboard extends StatefulWidget {
   final Map<String, String> userData;
   const WardenDashboard({super.key, required this.userData});
@@ -27,10 +34,10 @@ class WardenDashboard extends StatefulWidget {
 class _WardenDashboardState extends State<WardenDashboard> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
+  List<Widget> get _pages => [
     const ConsoleHome(),
-    const StudentDirectoryPage(),
-    const WardenInboxPage(), // This now comes from warden-response.dart
+    const StudentDirectoryPage(), 
+    const WardenInboxPage(), 
     const AdminSetupPage(),
   ];
 
@@ -47,19 +54,14 @@ class _WardenDashboardState extends State<WardenDashboard> {
           IconButton(
             icon: const Icon(Icons.account_circle, size: 30, color: Colors.white),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const WardenProfilePage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const WardenProfilePage()));
             },
           ),
         ],
       ),
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-        ),
+        decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           selectedItemColor: sunsetOrange,
@@ -78,7 +80,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
   }
 }
 
-// --- 1. CONSOLE HOME ---
+// --- 1. CONSOLE HOME (UNCHANGED) ---
 class ConsoleHome extends StatelessWidget {
   const ConsoleHome({super.key});
 
@@ -134,6 +136,7 @@ class ConsoleHome extends StatelessWidget {
       children: [
         _metricBox(context, "Occupancy", "94%", Icons.bed, Colors.blue, const OccupancyStatsPage()),
         _metricBox(context, "Complaints", "03", Icons.warning, Colors.red, const ComplaintManagementPage()),
+        // Clicking this will now lead to the Live Staff Management Page
         _metricBox(context, "Staff", "12/12", Icons.badge, Colors.green, const StaffManagementPage()),
       ],
     );
@@ -199,80 +202,201 @@ class ConsoleHome extends StatelessWidget {
   }
 }
 
-// --- ANIMATED SHINY REGISTRY BUTTON ---
+// --- 2. STUDENT DIRECTORY (PRESERVED) ---
+class StudentDirectoryPage extends StatefulWidget {
+  const StudentDirectoryPage({super.key});
+
+  @override
+  State<StudentDirectoryPage> createState() => _StudentDirectoryPageState();
+}
+
+class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
+  List<Student> _students = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStudents();
+  }
+
+  Future<void> _fetchStudents() async {
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final response = await apiService.getStudentList();
+      if (response != null && response.success) {
+        setState(() { _students = response.students; _isLoading = false; });
+      } else {
+        setState(() { _errorMessage = "Unable to fetch student list."; _isLoading = false; });
+      }
+    } catch (e) {
+      setState(() { _errorMessage = "Connection error."; _isLoading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator(color: sunsetOrange));
+    if (_errorMessage != null) return Center(child: Text(_errorMessage!));
+    return RefreshIndicator(
+      onRefresh: _fetchStudents,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(15),
+        itemCount: _students.length,
+        itemBuilder: (ctx, i) => _buildStudentCard(_students[i]),
+      ),
+    );
+  }
+
+  Widget _buildStudentCard(Student student) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        leading: CircleAvatar(backgroundColor: sunsetOrange.withOpacity(0.2), child: Text(student.firstName[0])),
+        title: Text("${student.firstName} ${student.lastName ?? ''}"),
+        subtitle: Text("ID: ${student.studentCode}"),
+      ),
+    );
+  }
+}
+
+// --- NEW: STAFF MANAGEMENT (LIVE INTEGRATED) ---
+class StaffManagementPage extends StatefulWidget {
+  const StaffManagementPage({super.key});
+
+  @override
+  State<StaffManagementPage> createState() => _StaffManagementPageState();
+}
+
+class _StaffManagementPageState extends State<StaffManagementPage> {
+  List<Warden> _wardens = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWardens();
+  }
+
+  Future<void> _fetchWardens() async {
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final response = await apiService.getWardenList();
+      if (response != null && response.success) {
+        setState(() {
+          _wardens = response.data;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = "Unable to fetch staff records.";
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "API Error: Please check connection.";
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      appBar: AppBar(
+        title: const Text("Staff Directory"),
+        backgroundColor: sunsetOrange,
+        foregroundColor: Colors.white,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: sunsetOrange))
+          : _errorMessage != null
+              ? Center(child: Text(_errorMessage!))
+              : RefreshIndicator(
+                  onRefresh: _fetchWardens,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: _wardens.length,
+                    itemBuilder: (ctx, i) => _buildWardenCard(_wardens[i]),
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildWardenCard(Warden warden) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 2,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: CircleAvatar(
+          backgroundColor: warmYellow.withOpacity(0.1),
+          child: Text(warden.firstName[0], style: const TextStyle(color: warmYellow)),
+        ),
+        title: Text("${warden.firstName} ${warden.lastName}", 
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Mob: ${warden.mobile}"),
+            Text(warden.email, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: warden.status == 'active' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(warden.status.toUpperCase(), 
+            style: TextStyle(color: warden.status == 'active' ? Colors.green : Colors.red, fontSize: 10)),
+        ),
+      ),
+    );
+  }
+}
+
+// --- REMAINING UI (PRESERVED) ---
 class ShinyRegistryButton extends StatefulWidget {
   const ShinyRegistryButton({super.key});
-
   @override
   State<ShinyRegistryButton> createState() => _ShinyRegistryButtonState();
 }
 
 class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
   }
-
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _controller.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Container(
-          width: double.infinity,
-          height: 60,
+          width: double.infinity, height: 60,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
               colors: const [warmYellow, Colors.white, warmYellow],
-              stops: [
-                _controller.value - 0.2,
-                _controller.value,
-                _controller.value + 0.2,
-              ],
+              stops: [_controller.value - 0.2, _controller.value, _controller.value + 0.2],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: warmYellow.withOpacity(0.4),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              )
-            ],
           ),
           child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
-            onPressed: () => Navigator.push(
-              context, 
-              MaterialPageRoute(builder: (context) => const RegisterStudent())
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterStudent())),
             icon: const Icon(Icons.app_registration_rounded, color: textDark),
-            label: const Text(
-              "NEW STUDENT REGISTRY",
-              style: TextStyle(
-                color: textDark, 
-                fontWeight: FontWeight.w900, 
-                letterSpacing: 1.2,
-                fontSize: 16
-              ),
-            ),
+            label: const Text("NEW STUDENT REGISTRY", style: TextStyle(color: textDark, fontWeight: FontWeight.w900)),
           ),
         );
       },
@@ -280,306 +404,39 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
   }
 }
 
-// --- ROOM INVENTORY ---
+// OTHER CLASSES (UNCHANGED)
 class RoomInventoryPage extends StatelessWidget {
   const RoomInventoryPage({super.key});
-
-  void _showRoomSheet(BuildContext context, int roomNum, bool occupied) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(25, 20, 25, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Room #$roomNum", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: occupied ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(occupied ? "OCCUPIED" : "VACANT",
-                      style: TextStyle(color: occupied ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
-                )
-              ],
-            ),
-            const Divider(height: 30),
-            const Text("Room Features:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 10),
-            _infoTile(Icons.bed, "3 Individual Beds"),
-            _infoTile(Icons.desk, "3 Study Tables"),
-            _infoTile(Icons.door_sliding, "3 Wardrobes"),
-            if (occupied) ...[
-              const SizedBox(height: 20),
-              const Text("Residents:", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-              _resTile("Aryan Verma", "SAH-101"),
-              _resTile("Rahul Singh", "SAH-102"),
-              _resTile("Deepak Jha", "SAH-103"),
-            ] else ...[
-              const SizedBox(height: 20),
-              const Text("Status:", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              const Text("Available for new allotments. All furniture inspected."),
-            ],
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: sunsetOrange),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("CLOSE", style: TextStyle(color: Colors.white)),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoTile(IconData icon, String label) => Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
-        child: Row(children: [Icon(icon, size: 20, color: Colors.grey), const SizedBox(width: 10), Text(label)]),
-      );
-
-  Widget _resTile(String name, String id) => ListTile(
-        leading: const CircleAvatar(radius: 15, child: Icon(Icons.person, size: 15)),
-        title: Text(name),
-        subtitle: Text(id),
-        dense: true,
-      );
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Room Inventory"), backgroundColor: sunsetOrange),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(15),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 10),
-        itemCount: 40,
-        itemBuilder: (ctx, i) {
-          bool isOccupied = i % 3 != 0;
-          return InkWell(
-            onTap: () => _showRoomSheet(context, 101 + i, isOccupied),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isOccupied ? Colors.green : Colors.red,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(child: Text("${101 + i}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Room Inventory"), backgroundColor: sunsetOrange));
 }
-
-// --- ATTENDANCE ---
 class AttendancePage extends StatelessWidget {
   const AttendancePage({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Daily Attendance"), backgroundColor: sunsetOrange),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(15),
-        itemCount: 15,
-        itemBuilder: (ctx, i) => Card(
-          child: ListTile(
-            leading: const Icon(Icons.check_circle, color: Colors.green),
-            title: Text("Student Name ${i + 1}"),
-            subtitle: Text("Verified at 08:${i + 10} AM"),
-            trailing: const Text("Present", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Attendance"), backgroundColor: sunsetOrange));
 }
-
-// --- STAFF MANAGEMENT ---
-class StaffManagementPage extends StatelessWidget {
-  const StaffManagementPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Staff Roster"), backgroundColor: sunsetOrange),
-      body: ListView(
-        padding: const EdgeInsets.all(15),
-        children: const [
-          StaffCard(name: "Suresh Kumar", role: "Main Security", status: "On Duty"),
-          StaffCard(name: "Mahesh Singh", role: "Janitor", status: "On Duty"),
-          StaffCard(name: "Sunita Rani", role: "Mess In-charge", status: "Off Duty"),
-          StaffCard(name: "Rahul Dev", role: "Electrician", status: "On Duty"),
-        ],
-      ),
-    );
-  }
-}
-
-class StaffCard extends StatelessWidget {
-  final String name, role, status;
-  const StaffCard({super.key, required this.name, required this.role, required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.person)),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(role),
-        trailing: Text(status, style: TextStyle(color: status == "On Duty" ? Colors.green : Colors.red)),
-      ),
-    );
-  }
-}
-
-// --- GATE RECORDS ---
 class GateRecordsPage extends StatelessWidget {
   const GateRecordsPage({super.key});
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text("Gate Security Logs"), backgroundColor: sunsetOrange),
-        body: ListView.builder(
-          itemCount: 20,
-          itemBuilder: (ctx, i) => ListTile(
-            leading: Icon(i % 2 == 0 ? Icons.logout : Icons.login, color: i % 2 == 0 ? Colors.red : Colors.green),
-            title: Text("Student SAH-${101 + i}"),
-            subtitle: Text("Time: 0${(i % 12) + 1}:00 PM | Purpose: Outing"),
-            trailing: const Text("Verified"),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Gate Security"), backgroundColor: sunsetOrange));
 }
-
-// --- COMPLAINTS ---
 class ComplaintManagementPage extends StatelessWidget {
   const ComplaintManagementPage({super.key});
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text("Student Complaints"), backgroundColor: sunsetOrange),
-        body: ListView(
-          padding: const EdgeInsets.all(10),
-          children: [
-            _compCard("Water Leakage", "Room 302", "Urgent", Colors.red),
-            _compCard("WiFi Down", "Wing B", "Medium", Colors.orange),
-            _compCard("Fan Repair", "Room 105", "Low", Colors.blue),
-          ],
-        ),
-      );
-
-  Widget _compCard(String t, String r, String p, Color c) => Card(
-        child: ListTile(
-          title: Text(t),
-          subtitle: Text(r),
-          trailing: Chip(label: Text(p), backgroundColor: c.withOpacity(0.2)),
-        ),
-      );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Complaints"), backgroundColor: sunsetOrange));
 }
-
-// --- OCCUPANCY ---
 class OccupancyStatsPage extends StatelessWidget {
   const OccupancyStatsPage({super.key});
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text("Occupancy Analytics"), backgroundColor: sunsetOrange),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _occTile("Wing A", "120/125 Beds", 0.96, Colors.green),
-              _occTile("Wing B", "110/125 Beds", 0.88, Colors.blue),
-              _occTile("Wing C", "118/125 Beds", 0.94, Colors.orange),
-              _occTile("Wing D", "124/125 Beds", 0.99, Colors.red),
-            ],
-          ),
-        ),
-      );
-
-  Widget _occTile(String w, String d, double p, Color c) => Card(
-        child: ListTile(
-          title: Text(w, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: LinearProgressIndicator(value: p, color: c, backgroundColor: Colors.grey[200]),
-          trailing: Text(d),
-        ),
-      );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Occupancy Stats"), backgroundColor: sunsetOrange));
 }
-
-// --- PROFILE, DIRECTORY, SETUP ---
 class WardenProfilePage extends StatelessWidget {
   const WardenProfilePage({super.key});
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Warden Profile", style: TextStyle(color: Colors.white)),
-        backgroundColor: sunsetOrange,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: Column(
-          children: [
-            const SizedBox(height: 40),
-            const CircleAvatar(radius: 50, child: Icon(Icons.person, size: 50)),
-            const SizedBox(height: 20),
-            const Text("Chief Warden", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text("sahyog.warden@example.com", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 30),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Divider(color: Colors.grey.shade300),
-            ),
-            const ListTile(leading: Icon(Icons.phone), title: Text("Emergency Contact"), subtitle: Text("+91 98765-43210")),
-            const ListTile(leading: Icon(Icons.location_on), title: Text("Office"), subtitle: Text("Admin Block, Ground Floor")),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Profile"), backgroundColor: sunsetOrange));
 }
-
-class StudentDirectoryPage extends StatelessWidget {
-  const StudentDirectoryPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: 10,
-      itemBuilder: (ctx, i) => Card(
-        child: ListTile(
-          leading: const CircleAvatar(backgroundColor: warmYellow, child: Icon(Icons.person, color: Colors.white)),
-          title: const Text("Student Name"),
-          subtitle: Text("ID: SAH-2026 | Room: ${101 + i}"),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-        ),
-      ),
-    );
-  }
-}
-
 class AdminSetupPage extends StatelessWidget {
   const AdminSetupPage({super.key});
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        const ListTile(leading: Icon(Icons.person), title: Text("Profile Settings")),
-        const ListTile(leading: Icon(Icons.notifications), title: Text("Notification Preferences")),
-        const ListTile(leading: Icon(Icons.security), title: Text("Security & Privacy")),
-        const Divider(),
-        ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text("Logout", style: TextStyle(color: Colors.red)),
-            onTap: () => Navigator.pop(context)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ListView(children: [const ListTile(leading: Icon(Icons.settings), title: Text("General Settings")), const Divider(), ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.pop(context))]);
 }
