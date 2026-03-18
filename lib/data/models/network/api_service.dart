@@ -1,15 +1,19 @@
 // ignore_for_file: use_build_context_synchronously
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:my_app/data/models/warden_list_response.dart';
-import 'rest_api_client.dart';
-import 'auth_local_storage.dart';
-import 'package:my_app/data/models/network/password_update_model.dart';
-import 'package:my_app/data/models/network/student_list_response.dart'; 
-// Add the import for your new Warden model here
-
 import 'package:flutter/material.dart';
 
+// --- MODELS ---
+import 'package:my_app/data/models/warden_list_response.dart';
+import 'package:my_app/data/models/network/password_update_model.dart';
+import 'package:my_app/data/models/network/student_list_response.dart'; 
+
+// --- CLIENTS & STORAGE ---
+import 'rest_api_client.dart';
+import 'auth_local_storage.dart';
+
+/// --- AUTH INTERCEPTOR ---
+/// Automatically attaches the Bearer token to every request
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -18,13 +22,27 @@ class AuthInterceptor extends Interceptor {
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("AuthInterceptor Error: $e");
+    }
+    
+    // Standard Sahyog API Headers
     options.headers['Accept'] = 'application/json';
     options.headers['Content-Type'] = 'application/json';
+    
     return handler.next(options);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response?.statusCode == 401) {
+      debugPrint("Session Expired: Redirecting to Login might be needed.");
+    }
+    return handler.next(err);
   }
 }
 
+/// --- MAIN API SERVICE ---
 class ApiService {
   late final RestAPIClient client;
   late final Dio _dio;
@@ -36,6 +54,7 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 30),
     ));
 
+    // Adding Interceptors for Auth and Logging
     _dio.interceptors.add(AuthInterceptor());
     
     _dio.interceptors.add(LogInterceptor(
@@ -48,26 +67,27 @@ class ApiService {
     client = RestAPIClient(_dio);
   }
 
-  // ================= MANAGER APIS =================
+  // ================= MANAGER / WARDEN APIS =================
 
   /// Fetches the list of students for the warden/manager
+  /// High-frequency sync targets this method.
   Future<StudentListResponse?> getStudentList() async {
     try {
-      return await client.getStudentList();
+      final response = await client.getStudentList();
+      return response;
     } catch (e) {
-      debugPrint("Error fetching Student List: $e");
+      debugPrint("Error fetching Student List from Client: $e");
       return null;
     }
   }
 
-  // --- NEW: WARDEN LIST API (Staff Management) ---
-  /// Fetches the list of wardens/staff. 
-  /// Note: As requested, this specifically targets the wardens endpoint.
+  /// NEW: WARDEN LIST API (Staff Management)
+  /// Fetches the list of staff from the wardens endpoint.
   Future<WardenListResponse?> getWardenList() async {
     try {
-      // Calling via _dio directly to handle the response body you provided
+      // Direct Dio call to ensure we capture the raw response body
       final response = await _dio.get("wardens");
-      if (response.data != null) {
+      if (response.data != null && response.data is Map<String, dynamic>) {
         return WardenListResponse.fromJson(response.data);
       }
       return null;
@@ -90,9 +110,9 @@ class ApiService {
     }
   }
 
-  // ================= BIOMETRIC / REGISTRATION APIS (UPDATED) =================
+  // ================= BIOMETRIC / REGISTRATION APIS =================
 
-  /// Updated to return the full Map so register.dart can check ['success']
+  /// Fetches students who are pending face enrollment
   Future<Map<String, dynamic>> getPendingEnrollments() async {
     try {
       final response = await _dio.get("public/pending-enrollment");
@@ -106,12 +126,18 @@ class ApiService {
     }
   }
 
+  /// Submits the generated Face Vector to the Sahyog server
   Future<dynamic> submitEnrollment(int studentId, List<double> faceVector) async {
-    final payload = {
-      "student_id": studentId,
-      "face_vector": faceVector,
-    };
-    return await client.submitEnrollment(payload);
+    try {
+      final payload = {
+        "student_id": studentId,
+        "face_vector": faceVector,
+      };
+      return await client.submitEnrollment(payload);
+    } catch (e) {
+      debugPrint("Enrollment Submission Error: $e");
+      rethrow;
+    }
   }
 
   // ================= PROFILE & AUTH APIS =================
@@ -157,7 +183,7 @@ class ApiService {
     return await client.applyLeave(payload);
   }
 
-  // ================= CHAT APIS (WHATSAPP FEATURES) =================
+  // ================= CHAT APIS (ELABORATED) =================
 
   Future<dynamic> setupChat() async {
     try {
@@ -228,4 +254,5 @@ class ApiService {
   }
 }
 
+// Global instance to be used across the app
 final apiService = ApiService();

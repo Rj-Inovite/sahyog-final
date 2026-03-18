@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-// Ensure these paths match your project structure exactly
+// --- MODELS (Ensure these paths are correct in your local lib/ folder) ---
 import 'package:my_app/data/models/login_response.dart';
 import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
-// ADD THIS IMPORT (Ensure the filename matches what you created in Step 1)
 import 'package:my_app/data/models/network/student_list_response.dart';
+import 'package:my_app/data/models/warden_list_response.dart'; // Added for Staff Directory
 
 part 'rest_api_client.g.dart';
 
@@ -17,18 +17,26 @@ abstract class RestAPIClient {
   // ================= MANAGER / WARDEN APIS =================
 
   /// Fetches the list of students for the manager/warden
+  /// Targets the specific Sahyog endpoint for the Student Directory
   @GET("manager/student-list")
   Future<StudentListResponse> getStudentList();
+
+  /// Fetches the list of wardens/staff for the Staff Directory
+  @GET("wardens")
+  Future<WardenListResponse> getWardenList();
+
+  /// Fetches detailed student view from Web Dashboard
+  /// Note: Path parameter {id} must match the @Path("id") variable
+  @GET("student/view/{id}")
+  Future<dynamic> getStudentView(@Path("id") int id);
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 
   /// Fetches students awaiting enrollment
-  /// Returns the full Map: {"success": true, "data": [...]}
   @GET("public/pending-enrollment")
   Future<dynamic> getPendingEnrollments();
 
   /// Submits the 192-dimension face vector to the server
-  /// Body: {"student_id": int, "face_vector": List<double>}
   @POST("attendance-enrollment")
   Future<dynamic> submitEnrollment(@Body() Map<String, dynamic> body);
 
@@ -42,10 +50,6 @@ abstract class RestAPIClient {
 
   @GET("user/profile")
   Future<dynamic> getProfile();
-
-  /// Fetches detailed student view from Web Dashboard
-  @GET("student/view/{id}")
-  Future<dynamic> getStudentView(@Path("id") int id);
 
   @POST("update-password")
   Future<PasswordUpdateResponse> updatePassword(@Body() PasswordUpdateRequest request);
@@ -63,7 +67,7 @@ abstract class RestAPIClient {
 
   // ================= CHAT APIS =================
   
-  /// Setup/Join a conversation room
+  /// Setup/Join a conversation room (e.g., General, Warden-Student)
   @POST("chat/setup")
   Future<dynamic> setupConversation(@Body() Map<String, dynamic> body);
 
@@ -72,6 +76,7 @@ abstract class RestAPIClient {
   Future<dynamic> sendWardenMessage(@Body() Map<String, dynamic> body);
 
   /// Fetches history for a specific conversation ID
+  /// Changed @Path("id") to match the common 'conversationId' logic if needed
   @GET("chat/messages/{id}")
   Future<dynamic> getChatHistory(@Path("id") int id);
 }
