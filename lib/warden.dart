@@ -48,7 +48,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
     return Scaffold(
       backgroundColor: backgroundWhite,
       appBar: AppBar(
-        title: const Text("Sahyog Warden Console",
+        title: const Text("Sahyog Hostel Manager  dashboard",
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 1.2)),
         backgroundColor: sunsetOrange,
         centerTitle: false,
@@ -82,10 +82,10 @@ class _WardenDashboardState extends State<WardenDashboard> {
           elevation: 0,
           onTap: (index) => setState(() => _currentIndex = index),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), activeIcon: Icon(Icons.grid_view_sharp), label: "Console"),
+            BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), activeIcon: Icon(Icons.grid_view_sharp), label: "Home"),
             BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups_rounded), label: "Students"),
             BottomNavigationBarItem(icon: Icon(Icons.alternate_email_rounded), activeIcon: Icon(Icons.mail_rounded), label: "Inbox"),
-            BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings_rounded), label: "Setup"),
+            BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings_rounded), label: "Settings"),
           ],
         ),
       ),
@@ -143,7 +143,7 @@ class ConsoleHome extends StatelessWidget {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          const Text("Warden Dashboard", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          const Text("Hostel Manager  Dashboard", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
