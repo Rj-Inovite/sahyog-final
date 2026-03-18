@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
+// ADD THIS IMPORT:
+import 'package:my_app/data/models/network/my_room_response.dart'; 
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -70,7 +72,6 @@ class ApiService {
   // ================= MANAGER / WARDEN APIS =================
 
   /// Fetches the list of students for the warden/manager
-  /// High-frequency sync targets this method.
   Future<StudentListResponse?> getStudentList() async {
     try {
       final response = await client.getStudentList();
@@ -82,10 +83,8 @@ class ApiService {
   }
 
   /// NEW: WARDEN LIST API (Staff Management)
-  /// Fetches the list of staff from the wardens endpoint.
   Future<WardenListResponse?> getWardenList() async {
     try {
-      // Direct Dio call to ensure we capture the raw response body
       final response = await _dio.get("wardens");
       if (response.data != null && response.data is Map<String, dynamic>) {
         return WardenListResponse.fromJson(response.data);
@@ -93,6 +92,26 @@ class ApiService {
       return null;
     } catch (e) {
       debugPrint("Error fetching Warden List: $e");
+      return null;
+    }
+  }
+
+  // ================= STUDENT ROOM & DASHBOARD =================
+
+  /// NEW: Fetches the room allotment details for the logged-in student.
+  /// Used in student.dart to show room details or "No Room Assigned" message.
+  Future<MyRoomResponse?> getMyRoomDetails() async {
+    try {
+      // Direct call to my-room endpoint. AuthInterceptor handles the token.
+      final response = await _dio.get("my-room");
+      
+      if (response.data != null && response.data is Map<String, dynamic>) {
+        return MyRoomResponse.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching My Room Details: $e");
+      // We return null so the UI can handle the error state gracefully
       return null;
     }
   }

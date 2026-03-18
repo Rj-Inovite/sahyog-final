@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/data/models/network/api_service.dart';
+import 'package:animate_do/animate_do.dart';
 
 // --- REQUIRED PROJECT IMPORTS ---
 import 'login.dart';
@@ -579,42 +580,241 @@ class AttendancePage extends StatelessWidget {
   }
 }
 
-// --- MODULE 3: MESS MENU ---
-class MessMenuPage extends StatelessWidget {
+// --- MODULE 3: MESS MENU ---// --- MODULE 3: MESS MENU (ANIMATED & ENHANCED) ---
+// Ensure this is in your pubspec.yaml
+
+class MessMenuPage extends StatefulWidget {
   const MessMenuPage({super.key});
+
+  @override
+  State<MessMenuPage> createState() => _MessMenuPageState();
+}
+
+class _MessMenuPageState extends State<MessMenuPage> {
+  int _selectedDayIndex = 0;
+
+  // Professional Color Palette
+  final Color primaryAmber = const Color(0xFFFFB300);
+  final Color darkSecondary = const Color(0xFF2D3436);
+  final Color bgCream = const Color(0xFFFFFDF5);
+
+  final List<Map<String, String>> menu = [
+    {"day": "Monday", "b": "Aloo Paratha", "l": "Rajma Rice", "d": "Mix Veg"},
+    {"day": "Tuesday", "b": "Poha & Tea", "l": "Kadhi Pakoda", "d": "Paneer Butter"},
+    {"day": "Wednesday", "b": "Idli Sambhar", "l": "Veg Biryani", "d": "Dal Tadka"},
+    {"day": "Thursday", "b": "Upma", "l": "Chole Bhature", "d": "Egg Curry"},
+    {"day": "Friday", "b": "Bread Butter", "l": "Aloo Gobhi", "d": "Chicken/Soya"},
+    {"day": "Saturday", "b": "Puri Sabzi", "l": "Dal Makhani", "d": "Kofta"},
+    {"day": "Sunday", "b": "Special Breakfast", "l": "Special Veg", "d": "Special Feast"},
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> menu = [
-      {"day": "Mon", "b": "Aloo Paratha", "l": "Rajma Rice", "d": "Mix Veg"},
-      {"day": "Tue", "b": "Poha & Tea", "l": "Kadhi Pakoda", "d": "Paneer Butter"},
-      {"day": "Wed", "b": "Idli Sambhar", "l": "Veg Biryani", "d": "Dal Tadka"},
-      {"day": "Thu", "b": "Upma", "l": "Chole Bhature", "d": "Egg Curry"},
-      {"day": "Fri", "b": "Bread Butter", "l": "Aloo Gobhi", "d": "Chicken/Soya"},
-      {"day": "Sat", "b": "Puri Sabzi", "l": "Dal Makhani", "d": "Kofta"},
-      {"day": "Sun", "b": "Special Breakfast", "l": "Special Veg", "d": "Special Feast"},
-    ];
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFBEB),
-      appBar: AppBar(title: const Text("Weekly Menu"), backgroundColor: Colors.orange, foregroundColor: Colors.white),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
+      backgroundColor: bgCream,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: bgCream,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: darkSecondary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "WEEKLY MENU",
+          style: TextStyle(
+            color: darkSecondary, 
+            fontWeight: FontWeight.w900, 
+            letterSpacing: 1.5,
+            fontSize: 18
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          _buildDaySelector(),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  // Breakfast
+                  _buildMealCard(
+                    "Breakfast", 
+                    menu[_selectedDayIndex]['b']!, 
+                    Icons.wb_twilight_rounded, 
+                    "08:00 AM - 09:30 AM", 
+                    const Color(0xFF4FC3F7), 
+                    0
+                  ),
+                  // Lunch
+                  _buildMealCard(
+                    "Lunch", 
+                    menu[_selectedDayIndex]['l']!, 
+                    Icons.wb_sunny_rounded, 
+                    "01:00 PM - 02:30 PM", 
+                    const Color(0xFFFF8A65), 
+                    200
+                  ),
+                  // Dinner
+                  _buildMealCard(
+                    "Dinner", 
+                    menu[_selectedDayIndex]['d']!, 
+                    Icons.nightlight_round, 
+                    "08:00 PM - 09:30 PM", 
+                    const Color(0xFF7986CB), 
+                    400
+                  ),
+                  const SizedBox(height: 30),
+                  _buildChefNote(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 1. Horizontal Scrollable Day Picker
+  Widget _buildDaySelector() {
+    return Container(
+      height: 90,
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         itemCount: menu.length,
-        itemBuilder: (ctx, i) => Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: ExpansionTile(
-            title: Text(menu[i]['day']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        itemBuilder: (context, index) {
+          bool isSelected = _selectedDayIndex == index;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedDayIndex = index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 70,
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? primaryAmber : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: isSelected
+                    ? [BoxShadow(color: primaryAmber.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 5))]
+                    : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    menu[index]['day']!.substring(0, 3).toUpperCase(),
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (isSelected)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      height: 4, width: 4,
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    )
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 2. Meal Timeline Card
+  Widget _buildMealCard(String type, String dish, IconData icon, String time, Color accent, int delay) {
+    return FadeInRight(
+      key: ValueKey("$_selectedDayIndex-$type"), // Key forces animation refresh on day change
+      duration: const Duration(milliseconds: 500),
+      delay: Duration(milliseconds: delay),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 10))],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
             children: [
-              _menuRow("Breakfast", menu[i]['b']!),
-              _menuRow("Lunch", menu[i]['l']!),
-              _menuRow("Dinner", menu[i]['d']!),
+              Container(width: 8, decoration: BoxDecoration(color: accent, borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), bottomLeft: Radius.circular(25)))),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(icon, size: 16, color: accent),
+                          const SizedBox(width: 8),
+                          Text(
+                            type.toUpperCase(),
+                            style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        dish,
+                        style: TextStyle(color: darkSecondary, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        time,
+                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: CircleAvatar(
+                  backgroundColor: accent.withOpacity(0.1),
+                  radius: 18,
+                  child: Icon(Icons.restaurant_menu, size: 16, color: accent),
+                ),
+              )
             ],
           ),
         ),
       ),
     );
   }
-  Widget _menuRow(String type, String dish) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(type, style: const TextStyle(color: Colors.grey)), Text(dish, style: const TextStyle(fontWeight: FontWeight.w600))]));
+
+  Widget _buildChefNote() {
+    return FadeInUp(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3F51B5),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: Colors.white, size: 24),
+            const SizedBox(width: 15),
+            const Expanded(
+              child: Text(
+                "Menu is updated every Sunday. Contact the Mess Committee for feedback.",
+                style: TextStyle(color: Colors.white, fontSize: 12, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // --- MODULE 4: PAYMENTS ---
