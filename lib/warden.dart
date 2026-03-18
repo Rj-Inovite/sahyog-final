@@ -312,7 +312,7 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
     // --- ROOM INFO TEMPORARILY DISABLED ---
     // Since roomInfo is commented out in student_list_response.dart,
     // we use a safe placeholder to prevent crashes.
-    const String roomDisplay = "Syncing Room Data...";
+    const String roomDisplay = "";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
