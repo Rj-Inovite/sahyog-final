@@ -139,7 +139,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   }
 }
 
-// --- MODULE: HOME CONTENT (STATEFUL TO HANDLE ROOM API) ---
+// --- MODULE: HOME CONTENT (HANDLES ROOM API VIA TOKEN) ---
 class _HomeContent extends StatefulWidget {
   final Map<String, String> userData;
   final Color primaryIndigo;
@@ -164,6 +164,8 @@ class _HomeContentState extends State<_HomeContent> {
     _fetchRoomDetails();
   }
 
+  // CORRECTED: This uses the apiService which handles tokens internally.
+  // It removes the explicit ID dependency that was causing the 404.
   Future<void> _fetchRoomDetails() async {
     try {
       final response = await apiService.getMyRoomDetails();
@@ -175,7 +177,9 @@ class _HomeContentState extends State<_HomeContent> {
       }
     } catch (e) {
       debugPrint("Dashboard Room Fetch Error: $e");
-      if (mounted) setState(() => _isLoadingRoom = false);
+      if (mounted) {
+        setState(() => _isLoadingRoom = false);
+      }
     }
   }
 
@@ -289,6 +293,7 @@ class _HomeContentState extends State<_HomeContent> {
   }
 
   Widget _buildResidenceInfo() {
+    // Corrected to use the existing data fields in your MyRoomResponse model
     String roomNo = _isLoadingRoom ? "..." : (_roomData?.data?.roomNumber ?? "N/A");
     String blockName = _isLoadingRoom ? "..." : (_roomData?.data?.blockName ?? "N/A");
 
@@ -557,7 +562,6 @@ class MessMenuPage extends StatefulWidget {
 class _MessMenuPageState extends State<MessMenuPage> {
   int _selectedDayIndex = 0;
   final Color primaryAmber = const Color(0xFFFFB300);
-  final Color darkSecondary = const Color(0xFF2D3436);
   final List<Map<String, String>> menu = [
     {"day": "Monday", "b": "Aloo Paratha", "l": "Rajma Rice", "d": "Mix Veg"},
     {"day": "Tuesday", "b": "Poha & Tea", "l": "Kadhi Pakoda", "d": "Paneer Butter"},
