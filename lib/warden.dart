@@ -207,8 +207,8 @@ class ConsoleHome extends StatelessWidget {
       crossAxisSpacing: 18,
       childAspectRatio: 1.25,
       children: [
-        _moduleCard(context, "Room Map", Icons.grid_view_rounded, const RoomInventoryPage(), "Manage Allotments"),
-        _moduleCard(context, "Roll Call", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
+        _moduleCard(context, "Room Allotment", Icons.grid_view_rounded, const RoomInventoryPage(), "Manage Allotments"),
+        _moduleCard(context, "Std attendance", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
         _moduleCard(context, "Staff", Icons.supervised_user_circle_rounded, const StaffManagementPage(), "Warden Directory"),
         _moduleCard(context, "Security Logs", Icons.security_rounded, const GateRecordsPage(), "Entry/Exit Log"),
       ],

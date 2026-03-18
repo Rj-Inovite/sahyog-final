@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animate_do/animate_do.dart';
 
-// ✅ USING YOUR CENTRAL API SERVICE & MODELS
+// ✅ RESTORED: USING YOUR CENTRAL API SERVICE & MODELS
 import '../data/models/network/api_service.dart'; 
 import '../data/models/network/password_update_model.dart';
 
@@ -19,24 +19,21 @@ class StudentProfile extends StatefulWidget {
 }
 
 class _StudentProfileState extends State<StudentProfile> with TickerProviderStateMixin {
-  // --- PREMIUM THEME COLORS ---
+  // --- PREMIUM SAHYOG THEME COLORS ---
   final Color primaryPurple = const Color(0xFF6A1B9A); 
   final Color accentPurple = const Color(0xFF9C27B0);
+  final Color deepPurple = const Color(0xFF4A148C);
   final Color lightLavender = const Color(0xFFF3E5F5);
   final Color bgWhite = Colors.white;
   final Color cardGrey = const Color(0xFFF8F9FA);
+  final Color softGrey = const Color(0xFFEEEEEE); // ✅ DEFINED: Error Fixed
 
   // Controllers for editable fields
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late TextEditingController _phoneController;
   late TextEditingController _addressController;
   
-  // ✅ API Data Holders with Default Fallbacks
-  String _aadhar = "Pending Sync";
-  String _institute = "Sahyog Associate";
-  String _course = "General Stream";
-  String _admissionDate = "N/A";
+  // ✅ API Data Holders
   String _status = "ACTIVE";
   String _rollNo = "N/A";
 
@@ -50,33 +47,41 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
   void initState() {
     super.initState();
     
-    // Initialize controllers with current local data from login
-    _nameController = TextEditingController(text: widget.userData['first_name'] ?? "Student");
-    _emailController = TextEditingController(text: widget.userData['email'] ?? "");
-    _phoneController = TextEditingController(text: widget.userData['mobile'] ?? "");
-    _addressController = TextEditingController(text: widget.userData['address'] ?? "");
+    // ✅ LOGIC: USE GMAIL PREFIX AS NAME IF FIRST_NAME IS NULL
+    String email = widget.userData['email'] ?? "student@gmail.com";
+    String gmailPrefix = email.split('@')[0].toUpperCase();
+    String initialName = widget.userData['first_name'] ?? gmailPrefix;
+
+    _nameController = TextEditingController(text: initialName);
+    _emailController = TextEditingController(text: email);
+    _addressController = TextEditingController(text: widget.userData['address'] ?? "Address not set");
     
-    // Fallback date from login info
-    if (widget.userData['created_at'] != null) {
-      _admissionDate = widget.userData['created_at'].toString().split('T')[0];
-    }
+    // 2 Tabs: Identity and Security
+    _tabController = TabController(length: 2, vsync: this);
 
-    _tabController = TabController(length: 4, vsync: this);
-
-    // ✅ FETCH REAL-TIME DATA ON LOAD
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchWebProfileData();
-    });
+    // Initializations
+    _loadSavedImage();
+    _fetchWebProfileData();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _addressController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  // --- PERSISTENCE: LOAD IMAGE FROM LOCAL STORAGE ---
+  Future<void> _loadSavedImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? imagePath = prefs.getString('saved_profile_path');
+    if (imagePath != null && File(imagePath).existsSync()) {
+      setState(() {
+        _profileImage = File(imagePath);
+      });
+    }
   }
 
   // --- API LOGIC: FETCH FROM WEB DASHBOARD ---
@@ -91,46 +96,40 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       if (response != null && response['success'] == true) {
         final data = response['data'];
         setState(() {
-          _aadhar = data['aadhar_number'] ?? "Verified";
-          _institute = data['educational_institute'] ?? _institute;
-          _course = data['course_name'] ?? _course;
           _status = (data['status'] ?? "ACTIVE").toString().toUpperCase();
           _rollNo = data['user_id']?.toString() ?? "N/A";
           
           if (data['permanent_address'] != null) {
             _addressController.text = data['permanent_address'];
           }
-          if (data['admission_date'] != null) {
-            _admissionDate = data['admission_date'].toString().split('T')[0];
-          }
         });
       }
     } catch (e) {
-      // ⚠️ HANDLE 404 OR SYNC ERROR GRACEFULLY
       debugPrint("API Fetch Error: $e");
-      _showSnackBar("Displaying session info.", Colors.orange);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- IMAGE PICKER LOGIC ---
+  // --- IMAGE PICKER & PERMANENT SAVING ---
   Future<void> _pickImage() async {
-    if (!_isEditing) return; 
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
     if (image != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_profile_path', image.path); 
       setState(() => _profileImage = File(image.path));
+      _showSnackBar("Profile image updated!", Colors.deepPurple);
     }
   }
 
-  // --- PASSWORD UPDATE LOGIC ---
+  // --- RESTORED: PASSWORD UPDATE LOGIC ---
   Future<void> _handlePasswordUpdate(String oldP, String newP, String confirmP) async {
     if (newP.isEmpty || oldP.isEmpty) {
-      _showSnackBar("Please enter passwords", Colors.orange);
+      _showSnackBar("Please fill all password fields", Colors.orange);
       return;
     }
     if (newP != confirmP) {
-      _showSnackBar("Passwords do not match", Colors.red);
+      _showSnackBar("New passwords do not match", Colors.red);
       return;
     }
 
@@ -150,7 +149,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
         _showSnackBar("Password updated successfully!", Colors.green);
       }
     } catch (e) {
-      _showSnackBar("Failed to sync password. Verify current one.", Colors.red);
+      _showSnackBar("Failed to update password. Check current one.", Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -174,7 +173,6 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       backgroundColor: bgWhite,
       body: Stack(
         children: [
-          // ✅ ADDED REFRESH INDICATOR
           RefreshIndicator(
             onRefresh: _fetchWebProfileData,
             color: primaryPurple,
@@ -193,11 +191,9 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     );
   }
 
-  // --- SUB-WIDGETS FOR CLARITY ---
-
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 250,
+      expandedHeight: 280,
       pinned: true,
       stretch: true,
       backgroundColor: primaryPurple,
@@ -211,31 +207,31 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [primaryPurple, accentPurple],
+              colors: [primaryPurple, accentPurple, deepPurple],
             ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 50),
               _buildProfileAvatar(),
-              const SizedBox(height: 12),
-              FadeInUp(
-                child: Text(_nameController.text.toUpperCase(), 
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              const SizedBox(height: 15),
+              FadeInDown(
+                child: Text(_nameController.text, 
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               ),
               Text(_emailController.text, 
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500)),
             ],
           ),
         ),
       ),
       actions: [
         IconButton(
-          icon: Icon(_isEditing ? Icons.check_circle_rounded : Icons.edit_note_rounded, color: Colors.white, size: 28),
+          icon: Icon(_isEditing ? Icons.check_circle_rounded : Icons.edit_note_rounded, color: Colors.white, size: 30),
           onPressed: () {
             setState(() => _isEditing = !_isEditing);
-            if (!_isEditing) _showSnackBar("Local profile view updated!", Colors.green);
+            if (!_isEditing) _showSnackBar("Profile View Updated!", Colors.green);
           },
         )
       ],
@@ -243,37 +239,40 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
   }
 
   Widget _buildProfileAvatar() {
-    return GestureDetector(
-      onTap: _pickImage,
-      child: ZoomIn(
-        child: Stack(
-          children: [
-            CircleAvatar(
-              radius: 55,
+    return ZoomIn(
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+            child: CircleAvatar(
+              radius: 60,
               backgroundColor: Colors.white,
               child: CircleAvatar(
-                radius: 52,
+                radius: 56,
                 backgroundColor: lightLavender,
                 backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
                 child: _profileImage == null 
-                    ? Icon(Icons.person_rounded, size: 55, color: primaryPurple) 
+                    ? Icon(Icons.person_rounded, size: 60, color: primaryPurple) 
                     : null,
               ),
             ),
-            if (_isEditing)
-              Positioned(
-                bottom: 0,
-                right: 4,
-                child: BounceInDown(
-                  child: const CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 16,
-                    child: Icon(Icons.camera_alt_rounded, size: 16, color: Color(0xFF6A1B9A)),
-                  ),
+          ),
+          Positioned(
+            bottom: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: _pickImage,
+              child: BounceInDown(
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 18,
+                  child: Icon(Icons.add_a_photo_rounded, size: 18, color: primaryPurple),
                 ),
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -281,7 +280,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
   Widget _buildTabBarSection() {
     return SliverToBoxAdapter(
       child: Container(
-        color: accentPurple,
+        color: deepPurple,
         child: Container(
           decoration: BoxDecoration(
             color: bgWhite,
@@ -293,12 +292,10 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
             unselectedLabelColor: Colors.grey[400],
             indicator: UnderlineTabIndicator(
               borderSide: BorderSide(width: 4, color: primaryPurple),
-              insets: const EdgeInsets.symmetric(horizontal: 20),
+              insets: const EdgeInsets.symmetric(horizontal: 40),
             ),
             tabs: const [
               Tab(icon: Icon(Icons.badge_rounded), text: "Identity"),
-              Tab(icon: Icon(Icons.door_front_door_rounded), text: "Room"),
-              Tab(icon: Icon(Icons.account_balance_wallet_rounded), text: "Fees"),
               Tab(icon: Icon(Icons.verified_user_rounded), text: "Security"),
             ],
           ),
@@ -313,8 +310,6 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
         controller: _tabController,
         children: [
           _buildIdentityTab(),
-          _buildRoomTab(),
-          _buildFinanceTab(),
           _buildSecurityTab(),
         ],
       ),
@@ -325,55 +320,25 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        FadeInUp(child: _buildTextField("Full Name", _nameController, Icons.person_outline)),
-        FadeInUp(delay: const Duration(milliseconds: 100), child: _buildTextField("Email Address", _emailController, Icons.alternate_email_rounded)),
-        FadeInUp(delay: const Duration(milliseconds: 200), child: _buildTextField("Mobile Number", _phoneController, Icons.phone_android_rounded)),
-        FadeInUp(delay: const Duration(milliseconds: 300), child: _buildStaticInfoCard("Aadhar Status", _aadhar, Icons.fingerprint_rounded)),
+        FadeInLeft(child: _buildTextField("Student Name", _nameController, Icons.person_outline, isReadOnly: !_isEditing)),
+        FadeInLeft(delay: const Duration(milliseconds: 100), child: _buildTextField("Official Email", _emailController, Icons.alternate_email_rounded, isReadOnly: true)),
+        FadeInLeft(delay: const Duration(milliseconds: 200), child: _buildTextField("Current Address", _addressController, Icons.home_outlined, isReadOnly: !_isEditing, isLong: true)),
         const SizedBox(height: 20),
-        FadeInUp(delay: const Duration(milliseconds: 400), child: _buildTextField("Local Address", _addressController, Icons.home_outlined, isLong: true)),
-      ],
-    );
-  }
-
-  Widget _buildRoomTab() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        FadeInLeft(child: _buildInfoCard("Educational Institute", _institute, Icons.apartment_rounded, "Official Record")),
-        const SizedBox(height: 12),
-        FadeInLeft(delay: const Duration(milliseconds: 100), child: _buildInfoCard("Course Name", _course, Icons.school_rounded, "Academic Stream")),
-        const SizedBox(height: 12),
-        FadeInLeft(delay: const Duration(milliseconds: 200), child: _buildInfoCard("Admission Date", _admissionDate, Icons.calendar_today_rounded, "Enrollment Date")),
-        const SizedBox(height: 12),
-        FadeInLeft(delay: const Duration(milliseconds: 300), child: _buildInfoCard("Student Status", _status, Icons.verified_user_rounded, "Current Validity")),
-      ],
-    );
-  }
-
-  Widget _buildFinanceTab() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        FadeInDown(
+        FadeInUp(
           child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [primaryPurple, accentPurple]),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Column(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: softGrey, borderRadius: BorderRadius.circular(15)),
+            child: Row(
               children: [
-                Text("Current Due Amount", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                SizedBox(height: 8),
-                Text("₹ 8,450", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                Icon(Icons.info_outline, color: primaryPurple, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text("Email is managed by admin and cannot be changed.", style: TextStyle(fontSize: 11, color: Colors.grey)),
+                )
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        _buildTransactionTile("Monthly Rent - March", "₹ 7,500", "Pending", Colors.orange),
-        _buildTransactionTile("Mess Charges - Feb", "₹ 2,400", "Paid", Colors.green),
-        _buildTransactionTile("Registration Fee", "₹ 1,000", "Paid", Colors.green),
+        )
       ],
     );
   }
@@ -382,35 +347,52 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        _buildActionTile("Update Password", "Manage your account safety", Icons.lock_reset_rounded, primaryPurple, _showPasswordSheet),
+        FadeInRight(
+          child: _buildActionTile(
+            "Change Password", 
+            "Update your portal security", 
+            Icons.lock_reset_rounded, 
+            primaryPurple, 
+            _showPasswordSheet
+          ),
+        ),
         const SizedBox(height: 16),
-        _buildActionTile("Logout", "Sign out from the application", Icons.logout_rounded, Colors.redAccent, () async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.clear();
-          Navigator.popUntil(context, (route) => route.isFirst);
-        }),
+        FadeInRight(
+          delay: const Duration(milliseconds: 100),
+          child: _buildActionTile(
+            "Logout Session", 
+            "Sign out from this device", 
+            Icons.logout_rounded, 
+            Colors.redAccent, 
+            () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              Navigator.popUntil(context, (route) => route.isFirst);
+            }
+          ),
+        ),
       ],
     );
   }
 
   // --- REUSABLE UI HELPERS ---
 
-  Widget _buildTextField(String label, TextEditingController ctrl, IconData icon, {bool isLong = false}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, IconData icon, {bool isReadOnly = false, bool isLong = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryPurple.withOpacity(0.7))),
           const SizedBox(height: 8),
           TextField(
             controller: ctrl,
-            enabled: _isEditing,
+            readOnly: isReadOnly,
             maxLines: isLong ? 3 : 1,
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: primaryPurple, size: 20),
+              prefixIcon: Icon(icon, color: isReadOnly ? Colors.grey : primaryPurple, size: 20),
               filled: true,
-              fillColor: _isEditing ? lightLavender.withOpacity(0.3) : cardGrey,
+              fillColor: isReadOnly ? cardGrey : lightLavender.withOpacity(0.3),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
               contentPadding: const EdgeInsets.all(16),
             ),
@@ -420,76 +402,11 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     );
   }
 
-  Widget _buildStaticInfoCard(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cardGrey, borderRadius: BorderRadius.circular(15), border: Border.all(color: lightLavender)),
-      child: Row(
-        children: [
-          Icon(icon, color: primaryPurple, size: 22),
-          const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, String val, IconData icon, String sub) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: cardGrey, borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          CircleAvatar(backgroundColor: lightLavender, child: Icon(icon, color: primaryPurple)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                Text(val, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                Text(sub, style: TextStyle(fontSize: 11, color: primaryPurple.withOpacity(0.7))),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransactionTile(String title, String amount, String status, Color statusColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cardGrey, borderRadius: BorderRadius.circular(15)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(status, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          Text(amount, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionTile(String title, String sub, IconData icon, Color color, VoidCallback tap) {
     return ListTile(
       onTap: tap,
       tileColor: cardGrey,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color)),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
@@ -499,7 +416,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
 
   Widget _buildLoadingOverlay() {
     return Container(
-      color: Colors.black45, 
+      color: Colors.black54, 
       child: const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
   }
@@ -521,7 +438,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
           children: [
             Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 25),
-            const Text("Change Password", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text("Update Security", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 25),
             _buildSheetField(oldC, "Current Password", Icons.lock_outline_rounded),
             const SizedBox(height: 15),
@@ -536,7 +453,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
               onPressed: () => _handlePasswordUpdate(oldC.text, newC.text, confC.text),
-              child: const Text("UPDATE PASSWORD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 40),
           ],

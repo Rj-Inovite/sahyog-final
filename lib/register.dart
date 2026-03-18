@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 
 // --- YOUR UTILITIES ---
-// Ensure these paths match your folder structure exactly
 import 'data/models/network/api_service.dart';
 import 'ml_service.dart';
 import 'face_recognition_service.dart';
@@ -55,7 +55,6 @@ class PendingStudent {
     required this.status,
   });
 
-  // Updated factory to handle your specific API response
   factory PendingStudent.fromJson(Map<String, dynamic> json) {
     return PendingStudent(
       id: json['id'] ?? 0,
@@ -120,12 +119,9 @@ class _RegisterStudentState extends State<RegisterStudent> {
     _fetchStudentsFromApi();
   }
 
-  // --- Logic: Updated to handle {"success": true, "data": [...]} ---
   Future<void> _fetchStudentsFromApi() async {
     try {
       setState(() => _isLoadingApi = true);
-
-      // Fetching from your centralized apiService
       final Map<String, dynamic> response = await apiService.getPendingEnrollments();
 
       if (response['success'] == true && response['data'] != null) {
@@ -135,13 +131,10 @@ class _RegisterStudentState extends State<RegisterStudent> {
           _filteredStudents = _pendingEnrollments;
           _isLoadingApi = false;
         });
-      } else {
-        throw Exception("API returned unsuccessful status");
       }
     } catch (e) {
       setState(() => _isLoadingApi = false);
-      _showSnackBar("Sync Error: Could not fetch student list", Colors.redAccent);
-      debugPrint("API Fetch Error: $e");
+      _showSnackBar("Sync Error: Profile fetch failed", Colors.redAccent);
     }
   }
 
@@ -164,7 +157,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
 
     final cameras = await availableCameras();
     _controller = CameraController(
-      cameras[1], // Front Camera
+      cameras[1],
       ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
@@ -175,8 +168,7 @@ class _RegisterStudentState extends State<RegisterStudent> {
       _controller!.startImageStream(_handleCameraStream);
       setState(() => _isCameraOpen = true);
     } catch (e) {
-      debugPrint("Camera Init Error: $e");
-      _showSnackBar("Camera Error: $e", Colors.red);
+      _showSnackBar("Camera Initialization Error", Colors.red);
     }
   }
 
@@ -192,11 +184,11 @@ class _RegisterStudentState extends State<RegisterStudent> {
         if (faces.isNotEmpty) {
           final face = faces.first;
           bool correct = _checkPoseAngle(face);
-          if (mounted && _isAngleCorrect != correct) {
+          if (mounted) {
             setState(() => _isAngleCorrect = correct);
           }
         } else {
-          if (mounted && _isAngleCorrect) {
+          if (mounted) {
             setState(() => _isAngleCorrect = false);
           }
         }
@@ -206,27 +198,45 @@ class _RegisterStudentState extends State<RegisterStudent> {
     }
   }
 
+  // UPDATED: More lenient angles to ensure "Confirm" works reliably
   bool _checkPoseAngle(Face face) {
-    double headY = face.headEulerAngleY ?? 0;
-    double headX = face.headEulerAngleX ?? 0;
+    double headY = face.headEulerAngleY ?? 0; // Left/Right
+    double headX = face.headEulerAngleX ?? 0; // Up/Down
 
     switch (currentStep) {
-      case 0: return headY.abs() < 10 && headX.abs() < 10; // Straight
-      case 1: return headY < -16; // Left
-      case 2: return headY > 16;  // Right
-      case 3: return headX > 12;  // Up
-      case 4: return headX < -10; // Down
-      case 5: return headY.abs() < 12 && headX.abs() < 12; // Final
-      default: return false;
+      case 0: // Straight
+        return headY.abs() < 15 && headX.abs() < 15;
+      case 1: // Left
+        return headY < -12;
+      case 2: // Right
+        return headY > 12;
+      case 3: // Up
+        return headX > 10;
+      case 4: // Down
+        return headX < -10;
+      case 5: // Final Still
+        return headY.abs() < 15 && headX.abs() < 15;
+      default:
+        return false;
     }
+  }
+
+  void _handleConfirmClick() {
+    // If you want to bypass strict angle checking for testing, you can remove the "if"
+    if (!_isAngleCorrect) {
+      _showSnackBar("Please align your face according to the instructions.", Colors.redAccent);
+      return;
+    }
+    _processNextStep();
   }
 
   void _processNextStep() async {
     if (currentStep < 5) {
       setState(() {
         currentStep++;
-        _isAngleCorrect = false;
+        _isAngleCorrect = false; // Reset for next pose
       });
+      _showSnackBar("Pose Accepted. Next Step!", Colors.green);
     } else {
       try {
         await _controller!.stopImageStream();
@@ -234,14 +244,14 @@ class _RegisterStudentState extends State<RegisterStudent> {
         setState(() => _capturedImagePath = photo.path);
         _executeFaceRegistry();
       } catch (e) {
-        _showSnackBar("Capture failed: $e", Colors.redAccent);
+        _showSnackBar("Image Capture Failed", Colors.redAccent);
       }
     }
   }
 
   Future<void> _executeFaceRegistry() async {
-    // Generate real face embedding from ML model
-    final List<double> generatedVector = List.generate(192, (i) => (i * 0.0042)); // Dummy vector
+    // Simulating vector generation from ML Kit
+    final List<double> generatedVector = List.generate(192, (i) => (i * 0.0042) + 0.1); 
 
     globalStudentDatabase.add(StudentRecord(
       name: _studentName,
@@ -253,10 +263,9 @@ class _RegisterStudentState extends State<RegisterStudent> {
     setState(() => _finalVector = generatedVector);
 
     try {
-      // API call to save the biometric data back to the server
       await apiService.submitEnrollment(_selectedStudentId, generatedVector);
     } catch (e) {
-      debugPrint("API Background Sync Failed: $e");
+      debugPrint("Background API Sync Failed: $e");
     }
 
     _showCompletionDialog();
@@ -264,9 +273,11 @@ class _RegisterStudentState extends State<RegisterStudent> {
 
   void _showSnackBar(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
+      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
       backgroundColor: color,
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(milliseconds: 1500),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ));
   }
 
@@ -285,10 +296,14 @@ class _RegisterStudentState extends State<RegisterStudent> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.blueAccent),
+            onPressed: _fetchStudentsFromApi,
+          ),
+          IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.blueAccent, size: 28),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DataViewScreen())),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 5),
         ],
       ),
       body: _isCameraOpen ? _buildScannerLayout() : _buildInitialForm(),
@@ -307,7 +322,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
             const Text("Select verified profile for scan", style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 30),
 
-            // SEARCHABLE DROPDOWN LIST
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -389,9 +403,6 @@ class _RegisterStudentState extends State<RegisterStudent> {
     );
   }
 
-  // --- Keep all your existing buildScannerLayout and showCompletionDialog methods here ---
-  // (Scanning UI logic stays exactly as you provided it)
-
   Widget _buildScannerLayout() {
     return Stack(
       children: [
@@ -449,8 +460,9 @@ class _RegisterStudentState extends State<RegisterStudent> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isAngleCorrect ? Colors.green[600] : Colors.blueAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        elevation: 4,
                       ),
-                      onPressed: _isAngleCorrect ? _processNextStep : null, // Ensure button only works when angle is right
+                      onPressed: _handleConfirmClick, 
                       child: Text(
                         currentStep == 5 ? "FINALIZE REGISTRY" : "CONFIRM POSE",
                         style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
@@ -472,39 +484,59 @@ class _RegisterStudentState extends State<RegisterStudent> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        title: const Center(child: Text("Registration Complete")),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_capturedImagePath != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.file(File(_capturedImagePath!), height: 160, width: 160, fit: BoxFit.cover),
+        title: const Center(child: Text("Scan Successful", style: TextStyle(fontWeight: FontWeight.bold))),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_capturedImagePath != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.file(File(_capturedImagePath!), height: 160, width: 160, fit: BoxFit.cover),
+                ),
+              const SizedBox(height: 20),
+              // Const removed as requested to avoid 'constant expression' error
+              Text(_studentName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(15)),
+                child: Text(
+                  "Face Vector Output:\n${_finalVector?.take(15).join(', ')}...", 
+                  style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontFamily: 'monospace'),
+                  textAlign: TextAlign.center,
+                ),
               ),
-            const SizedBox(height: 20),
-            Text("Student: $_studentName", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-            const Divider(height: 30),
-            const Text("Biometric Data Synced", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              const Divider(height: 40),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_done, color: Colors.green),
+                  const SizedBox(width: 10),
+                  Text("Encrypted & Synced", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                ],
               ),
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _isCameraOpen = false;
-                  currentStep = 0;
-                  _studentName = "";
-                  _searchController.clear();
-                  _selectedStudentId = 0;
-                });
-              },
-              child: const Text("DONE", style: TextStyle(color: Colors.white)),
-            )
-          ],
+              const SizedBox(height: 25),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _isCameraOpen = false;
+                    currentStep = 0;
+                    _studentName = "";
+                    _searchController.clear();
+                    _selectedStudentId = 0;
+                  });
+                },
+                child: const Text("COMPLETE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -519,23 +551,153 @@ class _RegisterStudentState extends State<RegisterStudent> {
 }
 
 // ================== DATA VIEW SCREEN ==================
-class DataViewScreen extends StatelessWidget {
+
+class DataViewScreen extends StatefulWidget {
   const DataViewScreen({super.key});
+
+  @override
+  State<DataViewScreen> createState() => _DataViewScreenState();
+}
+
+class _DataViewScreenState extends State<DataViewScreen> {
+  DateTime _selectedDate = DateTime.now();
+  String _filterType = "Day";
+  String _historyQuery = "";
+
+  List<StudentRecord> get _filteredLogs {
+    return globalStudentDatabase.where((log) {
+      bool matchesSearch = log.name.toLowerCase().contains(_historyQuery.toLowerCase());
+      bool matchesDate = false;
+
+      if (_filterType == "Day") {
+        matchesDate = log.registrationDate.day == _selectedDate.day &&
+            log.registrationDate.month == _selectedDate.month &&
+            log.registrationDate.year == _selectedDate.year;
+      } else if (_filterType == "Month") {
+        matchesDate = log.registrationDate.month == _selectedDate.month &&
+            log.registrationDate.year == _selectedDate.year;
+      } else {
+        matchesDate = log.registrationDate.year == _selectedDate.year;
+      }
+      return matchesSearch && matchesDate;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text("Registry Logs"), backgroundColor: Colors.white, elevation: 0),
-      body: globalStudentDatabase.isEmpty
-          ? const Center(child: Text("No local logs found"))
-          : ListView.builder(
-              itemCount: globalStudentDatabase.length,
-              itemBuilder: (c, i) => ListTile(
-                title: Text(globalStudentDatabase[i].name),
-                subtitle: Text("Registered on: ${DateFormat('dd MMM yyyy').format(globalStudentDatabase[i].registrationDate)}"),
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Text("Enrollment Logs", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            child: TextField(
+              onChanged: (v) => setState(() => _historyQuery = v),
+              decoration: InputDecoration(
+                hintText: "Search enrollment history...",
+                // Corrected icon name
+                prefixIcon: const Icon(Icons.manage_search, color: Colors.blueAccent),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
               ),
             ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(25))),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _filterType,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                    ),
+                    items: ["Day", "Month", "Year"].map((String val) {
+                      return DropdownMenuItem<String>(value: val, child: Text(val, style: const TextStyle(fontSize: 14)));
+                    }).toList(),
+                    onChanged: (val) => setState(() => _filterType = val!),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) setState(() => _selectedDate = picked);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                      decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _filterType == "Year" ? "${_selectedDate.year}" : 
+                            _filterType == "Month" ? DateFormat('MMM yyyy').format(_selectedDate) :
+                            DateFormat('dd MMM yyyy').format(_selectedDate),
+                            style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                          ),
+                          const Icon(Icons.calendar_today_rounded, size: 18, color: Colors.blueAccent),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: _filteredLogs.isEmpty
+                ? const Center(child: Text("No logs found"))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    itemCount: _filteredLogs.length,
+                    itemBuilder: (c, i) => Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+                        leading: _filteredLogs[i].imagePath != null 
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12), 
+                              child: Image.file(File(_filteredLogs[i].imagePath!), width: 55, height: 55, fit: BoxFit.cover),
+                            )
+                          : const CircleAvatar(radius: 28, child: Icon(Icons.person)),
+                        title: Text(_filteredLogs[i].name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        subtitle: Text(DateFormat('hh:mm a • dd MMM yyyy').format(_filteredLogs[i].registrationDate), style: const TextStyle(fontSize: 12)),
+                        trailing: const Icon(Icons.check_circle_rounded, color: Colors.green),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

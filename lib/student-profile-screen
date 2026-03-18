@@ -108,7 +108,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     } catch (e) {
       // ⚠️ HANDLE 404 OR SYNC ERROR GRACEFULLY
       debugPrint("API Fetch Error: $e");
-      _showSnackBar("Displaying session info. Web record pending.", Colors.orange);
+      _showSnackBar("Displaying session info.", Colors.orange);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
