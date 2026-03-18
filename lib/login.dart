@@ -10,8 +10,7 @@ import 'package:dio/dio.dart';
 // Dashboard imports
 import 'student.dart'; 
 import 'parent.dart';
-import 'warden.dart';
-
+import 'warden.dart'; // Ensure WardenDashboard is defined here
 import 'admin.dart';
 
 class LoginPage extends StatefulWidget {
@@ -30,7 +29,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
-  // New Aesthetic Palette
   final Color deepBlue = const Color(0xFF1E3A8A);
   final Color vibrantPink = const Color.fromRGBO(34, 14, 209, 1);
   final Color softBlue = const Color(0xFF60A5FA);
@@ -61,13 +59,14 @@ class _LoginPageState extends State<LoginPage> {
       String userUnique = (userObj?.userId ?? "").toString();
       String firstName  = (userObj?.firstName ?? "User").toString();
       String lastName   = (userObj?.lastName ?? "").toString();
-      String email      = (userObj?.email ?? "").toString();
+      String email      = (userObj?.email ?? _identifierController.text.trim()).toString();
 
       if (authToken.isEmpty) {
         _showFeedback("Error: Server returned no token.", Colors.redAccent);
         return;
       }
 
+      // Save Auth Data locally
       await AuthLocalStorage.saveAuthData(
         token: authToken,
         id: userId,
@@ -76,7 +75,9 @@ class _LoginPageState extends State<LoginPage> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString("user_name", firstName);
+      await prefs.setString("user_email", email); // Store email for profile use
 
+      // Prepare data map for Dashboards
       Map<String, String> userData = {
         "identifier": _identifierController.text.trim(),
         "role": serverRole,
@@ -90,16 +91,18 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       String normalizedRole = serverRole.toLowerCase();
+      widget.onRoleChange(serverRole); // Notify parent of role change
 
       Widget targetScreen;
+      
+      // --- ROLE BASED NAVIGATION ---
       if (normalizedRole.contains("warden") || normalizedRole.contains("hostel manager")) {
+        // Passing the full userData map to the WardenDashboard
         targetScreen = WardenDashboard(userData: userData);
       } else if (normalizedRole.contains("student") || normalizedRole.contains("hosteller")) {
         targetScreen = StudentDashboard(userData: userData);
       } else if (normalizedRole.contains("parent")) {
         targetScreen = ParentPortal(userData: userData);
-      } else if (normalizedRole.contains("admin")) {
-        targetScreen = AdminDashboard(userData: userData);
       } else {
         targetScreen = AdminDashboard(userData: userData);
       }
@@ -123,6 +126,8 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // --- UI COMPONENTS (UNCHANGED TO PRESERVE YOUR AESTHETIC) ---
+
   void _showFeedback(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -140,7 +145,6 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Mesh Gradient Background (Pink & Blue)
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -160,8 +164,6 @@ class _LoginPageState extends State<LoginPage> {
             right: -80,
             child: _buildBlurCircle(400, vibrantPink.withOpacity(0.3)),
           ),
-          
-          // 2. Main Content
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -186,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo/Branding
                         Container(
                           height: 80,
                           width: 80,
@@ -219,8 +220,6 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 40),
-
-                        // Input Fields
                         _buildCustomField(
                           controller: _identifierController,
                           label: "Email Address",
@@ -238,8 +237,6 @@ class _LoginPageState extends State<LoginPage> {
                           validator: (v) => v!.isEmpty ? "Enter your password" : null,
                         ),
                         const SizedBox(height: 40),
-
-                        // Login Button
                         SizedBox(
                           width: double.infinity,
                           height: 58,
