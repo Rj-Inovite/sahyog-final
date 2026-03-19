@@ -1,5 +1,8 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+// --- STORAGE ---
 import 'auth_local_storage.dart';
 
 /// This Interceptor automatically adds the Bearer Token to every outgoing request.
@@ -11,23 +14,22 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // 1. Retrieve the token from your Local Storage
-    // This is asynchronous, but Dio waits for this before sending the request.
+    // 1. Retrieve the token from Local Storage
+    // Dio waits for this 'await' before moving to the next step.
     final String? token = await AuthLocalStorage.getToken();
 
-    // 2. If token exists, inject it into the Authorization header
-    // Use the standard 'Bearer ' prefix required by Laravel/Passport/Sanctum.
+    // 2. Standardize Headers for Laravel/PHP Backends
+    // This ensures the server always communicates via JSON, even on errors.
+    options.headers['Accept'] = 'application/json';
+    options.headers['Content-Type'] = 'application/json';
+
+    // 3. Inject Bearer Token if available
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
-      debugPrint("--- AUTH: Token Injected for ${options.path} ---");
+      // debugPrint("--- AUTH: Token Injected for ${options.path} ---");
     } else {
       debugPrint("--- AUTH: No Token Found for ${options.path} ---");
     }
-
-    // 3. Set standard headers for Web/Server compatibility
-    // 'Accept: application/json' tells the server to return JSON even on errors (e.g., 422 validation).
-    options.headers['Accept'] = 'application/json';
-    options.headers['Content-Type'] = 'application/json';
 
     // 4. Continue with the request
     return handler.next(options);
@@ -35,8 +37,8 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    // Optional: Log successful status codes for debugging high-frequency syncs
-    if (response.statusCode == 200) {
+    // Log successful status codes for debugging high-frequency syncs
+    if (response.statusCode == 200 || response.statusCode == 201) {
       debugPrint("--- API SUCCESS: [${response.requestOptions.path}] ---");
     }
     return handler.next(response);
@@ -51,16 +53,23 @@ class AuthInterceptor extends Interceptor {
       // Clear local storage so the app doesn't try to use the bad token again
       AuthLocalStorage.clearAuthData();
       
-      // Note: In a real app, you might use a Global Navigator Key 
-      // to push the user back to the Login Screen here.
+      // PRO TIP: You can use a global stream or event bus here to 
+      // trigger the UI to pop back to the Login Screen.
     }
 
-    // 6. Handle Server Errors (500) or Connection Issues
-    if (err.type == DioExceptionType.connectionTimeout) {
-      debugPrint("--- NETWORK ERROR: Connection Timeout. Check Sahyog Server. ---");
+    // 6. Specific Logging for the 404 Errors you are seeing
+    if (err.response?.statusCode == 404) {
+      debugPrint("--- ROUTE ERROR: 404 Not Found at ${err.requestOptions.path} ---");
+      debugPrint("Check if 'manager/warden-list' is correctly defined in api.php");
     }
 
-    // Continue passing the error so the UI (ApiService) can catch it
+    // 7. Handle Connection Issues
+    if (err.type == DioExceptionType.connectionTimeout || 
+        err.type == DioExceptionType.receiveTimeout) {
+      debugPrint("--- NETWORK ERROR: Timeout. Sahyog Server might be down or slow. ---");
+    }
+
+    // Continue passing the error so the ApiService can handle the UI state
     return handler.next(err);
   }
 }

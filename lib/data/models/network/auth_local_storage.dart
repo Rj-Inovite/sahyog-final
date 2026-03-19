@@ -38,7 +38,8 @@ class AuthLocalStorage {
   /// Returns stored Bearer token.
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    final token = prefs.getString(_tokenKey);
+    return (token != null && token.isNotEmpty) ? token : null;
   }
 
   /// HELPER: Returns the full Authorization Header Map.
@@ -46,7 +47,7 @@ class AuthLocalStorage {
   static Future<Map<String, String>> getAuthHeader() async {
     final token = await getToken();
     return {
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer ${token ?? ""}',
       'Accept': 'application/json',
     };
   }
@@ -71,7 +72,13 @@ class AuthLocalStorage {
   /// Decides whether to show Login or Dashboard on App Start.
   static Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    return token != null;
+  }
+
+  /// Quick check for role-based UI rendering
+  static Future<bool> isWarden() async {
+    final role = await getUserRole();
+    return role?.toLowerCase() == 'warden' || role?.toLowerCase() == 'manager';
   }
 
   /// Safe Logout: Removes credentials but keeps app settings (like theme).

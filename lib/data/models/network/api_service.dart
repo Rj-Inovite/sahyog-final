@@ -2,15 +2,13 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:my_app/data/models/my_hostel_info_response.dart';
 
 // --- MODELS ---
+import 'package:my_app/data/models/my_hostel_info_response.dart';
 import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/network/my_room_response.dart'; 
-// ADD THIS IMPORT (Ensure the path matches where you saved Step 1 from previous message)
-
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -56,8 +54,8 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 30),
     ));
 
+    // Add Interceptors
     _dio.interceptors.add(AuthInterceptor());
-    
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
       responseBody: true, 
@@ -65,12 +63,12 @@ class ApiService {
       error: true,
     ));
 
+    // Initialize Retrofit client with the configured Dio instance
     client = RestAPIClient(_dio);
   }
 
   // ================= STUDENT HOSTEL INFO API =================
 
-  /// Fetches the hostel info, including assigned managers for the student
   Future<MyHostelInfoResponse?> getMyHostelInfo() async {
     try {
       final response = await _dio.get("my-hostel-info");
@@ -86,7 +84,6 @@ class ApiService {
 
   // ================= MANAGER / WARDEN APIS =================
 
-  /// Fetches the list of students for the warden/manager
   Future<StudentListResponse?> getStudentList() async {
     try {
       final response = await _dio.get("manager/student-list");
@@ -94,30 +91,33 @@ class ApiService {
         return StudentListResponse.fromJson(response.data);
       }
       return null;
-    } catch (e) {
-      debugPrint("Error fetching Student List: $e");
+    } on DioException catch (e) {
+      _handleDioError("Student List", e);
       return null;
     }
   }
 
-  /// FIXED: WARDEN LIST API
   Future<WardenListResponse?> getWardenList() async {
     try {
-      final response = await _dio.get("manager/warden-list"); 
+      // UPDATED: Path matches your Laravel route: Route::get('/warden/profile'...)
+      final response = await _dio.get("warden/profile"); 
       
       if (response.statusCode == 200 && response.data != null) {
         return WardenListResponse.fromJson(response.data);
       }
       return null;
-    } catch (e) {
-      debugPrint("Error fetching Warden List (trying manager/warden-list): $e");
-      try {
-        final retryResponse = await _dio.get("wardens");
-        if (retryResponse.statusCode == 200 && retryResponse.data != null) {
-          return WardenListResponse.fromJson(retryResponse.data);
-        }
-      } catch (_) {}
+    } on DioException catch (e) {
+      _handleDioError("Warden List", e);
       return null;
+    }
+  }
+
+  // Private helper for cleaner error logging
+  void _handleDioError(String apiName, DioException e) {
+    if (e.response?.statusCode == 404) {
+      debugPrint("Sahyog API 404: $apiName endpoint not found at ${e.requestOptions.path}");
+    } else {
+      debugPrint("Dio Error ($apiName): ${e.message}");
     }
   }
 
@@ -140,8 +140,7 @@ class ApiService {
 
   Future<dynamic> getStudentProfileView(int studentId) async {
     try {
-      final response = await client.getStudentView(studentId);
-      return response; 
+      return await client.getStudentView(studentId);
     } catch (e) {
       debugPrint("Error fetching Student View: $e");
       rethrow;

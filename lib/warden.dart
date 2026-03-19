@@ -105,41 +105,81 @@ class _WardenDashboardState extends State<WardenDashboard> {
   }
 }
 
-// --- SECTION 1: CONSOLE HOME ---
-class ConsoleHome extends StatelessWidget {
+// --- SECTION 1: CONSOLE HOME (NOW INTEGRATES PROFILE API) ---
+class ConsoleHome extends StatefulWidget {
   final Map<String, String> userData;
   const ConsoleHome({super.key, required this.userData});
 
   @override
+  State<ConsoleHome> createState() => _ConsoleHomeState();
+}
+
+class _ConsoleHomeState extends State<ConsoleHome> {
+  bool _isProfileLoading = true;
+  String? _wardenName;
+  String? _hostelName;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWardenProfileData();
+  }
+
+  Future<void> _fetchWardenProfileData() async {
+    try {
+      final response = await apiService.getWardenList(); // Using this to get the logged_in_warden key
+      if (response != null && response.success == true) {
+        setState(() {
+          // Mapping from your specific response structure
+          _wardenName = response.loggedInWarden; 
+          _hostelName = response.hostelName;
+          _isProfileLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Hero Header Sync Error: $e");
+      setState(() => _isProfileLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        children: [
-          _buildHeroHeader(),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Live Statistics", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textDark)),
-                const SizedBox(height: 15),
-                _buildQuickStats(context),
-                const SizedBox(height: 25),
-                const ShinyRegistryButton(), 
-                const SizedBox(height: 30),
-                const Text("Management Modules", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textDark)),
-                const SizedBox(height: 15),
-                _buildModuleGrid(context),
-              ],
+    return RefreshIndicator(
+      onRefresh: _fetchWardenProfileData,
+      color: sunsetOrange,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        child: Column(
+          children: [
+            _buildHeroHeader(),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Live Statistics", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textDark)),
+                  const SizedBox(height: 15),
+                  _buildQuickStats(context),
+                  const SizedBox(height: 25),
+                  const ShinyRegistryButton(), 
+                  const SizedBox(height: 30),
+                  const Text("Management Modules", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textDark)),
+                  const SizedBox(height: 15),
+                  _buildModuleGrid(context),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeroHeader() {
+    // Dynamic fallback to userData if API hasn't loaded yet
+    String displayName = _wardenName ?? widget.userData['name'] ?? 'Warden';
+    String subtitle = _hostelName ?? "Sahyog Management";
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 45, horizontal: 25),
@@ -156,8 +196,10 @@ class ConsoleHome extends StatelessWidget {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          Text("${userData['name'] ?? 'Warden'}", 
+          Text(displayName, 
             style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -368,6 +410,7 @@ class StaffManagementPage extends StatefulWidget {
 
 class _StaffManagementPageState extends State<StaffManagementPage> {
   List<Warden> _wardens = [];
+  String? _currentUser;
   bool _isLoading = true;
 
   @override
@@ -382,8 +425,8 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
       if (response != null && (response.success ?? false)) {
         if (mounted) {
           setState(() { 
-            // Corrected to use the nullable safe 'data' from your WardenListResponse model
             _wardens = response.data ?? []; 
+            _currentUser = response.loggedInWarden;
             _isLoading = false; 
           });
         }
@@ -427,20 +470,34 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
   }
 
   Widget _buildWardenTile(Warden warden) {
+    bool isMe = warden.wardenName == _currentUser;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
         color: Colors.white, 
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isMe ? sunsetOrange.withOpacity(0.5) : Colors.transparent, width: 1.5),
         boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: sunsetOrange, 
-          child: Icon(Icons.verified_user_rounded, color: Colors.white, size: 20)
+        leading: CircleAvatar(
+          backgroundColor: isMe ? sunsetOrange : sunsetOrange.withOpacity(0.1), 
+          child: Icon(Icons.verified_user_rounded, color: isMe ? Colors.white : sunsetOrange, size: 20)
         ),
-        // Uses 'wardenName' from your @JsonKey mapping
-        title: Text(warden.wardenName ?? "Unknown Warden", style: const TextStyle(fontWeight: FontWeight.w900)),
+        title: Row(
+          children: [
+            Text(warden.wardenName ?? "Unknown Warden", style: const TextStyle(fontWeight: FontWeight.w900)),
+            if (isMe) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: sunsetOrange.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
+                child: const Text("YOU", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: sunsetOrange)),
+              )
+            ]
+          ],
+        ),
         subtitle: Text("${warden.email ?? ''} | ${warden.mobile ?? ''}", style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
         onTap: () {

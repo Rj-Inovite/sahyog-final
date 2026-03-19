@@ -20,8 +20,7 @@ abstract class RestAPIClient {
   @GET("manager/student-list")
   Future<StudentListResponse> getStudentList();
 
-  /// FIXED: Updated to "manager/warden-list" 
-  /// Previous attempts (warden/list, wardens) returned 404.
+  /// Fetches the list of wardens/managers
   @GET("manager/warden-list")
   Future<WardenListResponse> getWardenList();
 
@@ -34,6 +33,7 @@ abstract class RestAPIClient {
   @GET("public/pending-enrollment")
   Future<dynamic> getPendingEnrollments();
 
+  /// Enrollment submission for face vectors
   @POST("attendance-enrollment")
   Future<dynamic> submitEnrollment(@Body() Map<String, dynamic> body);
 
