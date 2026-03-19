@@ -94,7 +94,7 @@ class _StudentDashboardState extends State<StudentDashboard>
               accentPink: accentPink),
           const AttendancePage(),
           WardenChatScreen(userData: widget.userData),
-          const SettingsPage(), 
+          const SettingsPage(),
         ],
       ),
       bottomNavigationBar: _buildEnhancedBottomNav(),
@@ -164,8 +164,6 @@ class _HomeContentState extends State<_HomeContent> {
     _fetchRoomDetails();
   }
 
-  // CORRECTED: This uses the apiService which handles tokens internally.
-  // It removes the explicit ID dependency that was causing the 404.
   Future<void> _fetchRoomDetails() async {
     try {
       final response = await apiService.getMyRoomDetails();
@@ -293,15 +291,15 @@ class _HomeContentState extends State<_HomeContent> {
   }
 
   Widget _buildResidenceInfo() {
-    // Corrected to use the existing data fields in your MyRoomResponse model
+    // UPDATED: Mapping correctly to your JSON response keys
     String roomNo = _isLoadingRoom ? "..." : (_roomData?.data?.roomNumber ?? "N/A");
-    String blockName = _isLoadingRoom ? "..." : (_roomData?.data?.blockName ?? "N/A");
+    String bedNo = _isLoadingRoom ? "..." : (_roomData?.data?.bedNumber ?? "N/A");
 
     return Row(
       children: [
-        Expanded(child: _infoTile("ROOM", roomNo, Icons.meeting_room, const Color(0xFFFF9800))),
+        Expanded(child: _infoTile(" ROOM NO", roomNo, Icons.meeting_room, const Color(0xFFFF9800))),
         const SizedBox(width: 15),
-        Expanded(child: _infoTile("BLOCK", blockName, Icons.domain, const Color(0xFF4CAF50))),
+        Expanded(child: _infoTile("BED NO", bedNo, Icons.bed_rounded, const Color(0xFF4CAF50))),
       ],
     );
   }

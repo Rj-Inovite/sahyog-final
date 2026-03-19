@@ -23,40 +23,47 @@ class MyRoomResponse {
 }
 
 class RoomData {
-  int? id;
-  String? roomNumber; // Matches your UI call: _roomData?.data?.roomNumber
-  String? blockName;  // Matches your UI call: _roomData?.data?.blockName
+  String? studentName;
+  int? hostelId;
+  String? roomNumber;
+  int? floor;
+  String? bedNumber; // Corrected field
   String? roomType;
-  int? capacity;
-  int? occupancy;
+  String? status;
+  int? monthlyRent;
 
   RoomData({
-    this.id,
+    this.studentName,
+    this.hostelId,
     this.roomNumber,
-    this.blockName,
+    this.floor,
+    this.bedNumber,
     this.roomType,
-    this.capacity,
-    this.occupancy,
+    this.status,
+    this.monthlyRent,
   });
 
   RoomData.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    // Logic to handle different backend naming conventions (snake_case vs camelCase)
-    roomNumber = json['room_number'] ?? json['roomNumber'];
-    blockName = json['block_name'] ?? json['blockName'];
-    roomType = json['room_type'] ?? json['roomType'];
-    capacity = json['capacity'];
-    occupancy = json['occupancy'];
+    studentName = json['student_name'];
+    hostelId = json['hostel_id'];
+    roomNumber = json['room_number']?.toString();
+    floor = json['floor'];
+    bedNumber = json['bed_number']?.toString(); // Mapping from API 'bed_number'
+    roomType = json['room_type'];
+    status = json['status'];
+    monthlyRent = json['monthly_rent'];
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
+    data['student_name'] = studentName;
+    data['hostel_id'] = hostelId;
     data['room_number'] = roomNumber;
-    data['block_name'] = blockName;
+    data['floor'] = floor;
+    data['bed_number'] = bedNumber;
     data['room_type'] = roomType;
-    data['capacity'] = capacity;
-    data['occupancy'] = occupancy;
+    data['status'] = status;
+    data['monthly_rent'] = monthlyRent;
     return data;
   }
 }
