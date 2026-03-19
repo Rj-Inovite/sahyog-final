@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:my_app/data/models/my_hostel_info_response.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 import 'package:animate_do/animate_do.dart';
 
@@ -11,10 +12,11 @@ import 'login.dart';
 import 'student_profile.dart';
 import 'warden_chat_screen.dart';
 import 'leave_history_page.dart';
-// Model for Room Details
+
+// --- MODELS LAYER ---
 import 'package:my_app/data/models/network/my_room_response.dart';
 
-// --- DATA & MODELS LAYER ---
+
 class ChatData {
   static List<Map<String, dynamic>> messages = [
     {
@@ -54,10 +56,10 @@ class _StudentDashboardState extends State<StudentDashboard>
   int _currentIndex = 0;
   late PageController _pageController;
 
-  // Professional Theme Palette
-  final Color primaryIndigo = const Color(0xFF3F51B5);
-  final Color accentPink = const Color(0xFFE91E63);
-  final Color softBg = const Color(0xFFF1F4F9);
+  final Color primaryBlue = const Color(0xFF1A237E);
+  final Color secondaryBlue = const Color(0xFF283593);
+  final Color accentBlue = const Color(0xFF3949AB);
+  final Color softBg = const Color(0xFFF4F7FA);
 
   @override
   void initState() {
@@ -90,8 +92,8 @@ class _StudentDashboardState extends State<StudentDashboard>
         children: [
           _HomeContent(
               userData: widget.userData,
-              primaryIndigo: primaryIndigo,
-              accentPink: accentPink),
+              primaryBlue: primaryBlue,
+              secondaryBlue: secondaryBlue),
           const AttendancePage(),
           WardenChatScreen(userData: widget.userData),
           const SettingsPage(),
@@ -109,7 +111,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: primaryBlue.withOpacity(0.1),
               blurRadius: 20,
               offset: const Offset(0, 5))
         ],
@@ -118,20 +120,20 @@ class _StudentDashboardState extends State<StudentDashboard>
         borderRadius: BorderRadius.circular(30),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: accentPink,
+          selectedItemColor: primaryBlue,
           unselectedItemColor: Colors.grey.shade400,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           elevation: 0,
           onTap: _navigateToPage,
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
+            BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: "Home"),
             BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today_rounded), label: "Attendance"),
+                icon: Icon(Icons.calendar_month_rounded), label: "Attendance"),
             BottomNavigationBarItem(
-                icon: Icon(Icons.chat_bubble_rounded), label: "Inbox"),
+                icon: Icon(Icons.forum_rounded), label: "Inbox"),
             BottomNavigationBarItem(
-                icon: Icon(Icons.settings_rounded), label: "Settings"),
+                icon: Icon(Icons.tune_rounded), label: "Settings"),
           ],
         ),
       ),
@@ -139,16 +141,16 @@ class _StudentDashboardState extends State<StudentDashboard>
   }
 }
 
-// --- MODULE: HOME CONTENT (HANDLES ROOM API VIA TOKEN) ---
+// --- MODULE: HOME CONTENT (HANDLES ROOM & HOSTEL API + REFRESH) ---
 class _HomeContent extends StatefulWidget {
   final Map<String, String> userData;
-  final Color primaryIndigo;
-  final Color accentPink;
+  final Color primaryBlue;
+  final Color secondaryBlue;
 
   const _HomeContent(
       {required this.userData,
-      required this.primaryIndigo,
-      required this.accentPink});
+      required this.primaryBlue,
+      required this.secondaryBlue});
 
   @override
   State<_HomeContent> createState() => _HomeContentState();
@@ -156,12 +158,27 @@ class _HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<_HomeContent> {
   bool _isLoadingRoom = true;
+  bool _isLoadingHostel = true;
   MyRoomResponse? _roomData;
+  MyHostelInfoResponse? _hostelData;
 
   @override
   void initState() {
     super.initState();
-    _fetchRoomDetails();
+    _fetchDashboardData();
+  }
+
+  // Logic to refresh all dashboard data
+  Future<void> _fetchDashboardData() async {
+    setState(() {
+      _isLoadingRoom = true;
+      _isLoadingHostel = true;
+    });
+    
+    await Future.wait([
+      _fetchRoomDetails(),
+      _fetchHostelInfo(),
+    ]);
   }
 
   Future<void> _fetchRoomDetails() async {
@@ -174,10 +191,23 @@ class _HomeContentState extends State<_HomeContent> {
         });
       }
     } catch (e) {
-      debugPrint("Dashboard Room Fetch Error: $e");
+      debugPrint("Room Fetch Error: $e");
+      if (mounted) setState(() => _isLoadingRoom = false);
+    }
+  }
+
+  Future<void> _fetchHostelInfo() async {
+    try {
+      final response = await apiService.getMyHostelInfo();
       if (mounted) {
-        setState(() => _isLoadingRoom = false);
+        setState(() {
+          _hostelData = response;
+          _isLoadingHostel = false;
+        });
       }
+    } catch (e) {
+      debugPrint("Hostel Info Fetch Error: $e");
+      if (mounted) setState(() => _isLoadingHostel = false);
     }
   }
 
@@ -188,68 +218,76 @@ class _HomeContentState extends State<_HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 80,
-          floating: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [widget.primaryIndigo, widget.accentPink]),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.notifications_active, color: Colors.white),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
-          ),
-          title: const Text("SAHYOG PORTAL",
-              style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  fontSize: 20,
-                  color: Colors.white)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: IconButton(
-                icon: const CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.white24,
-                  child: Icon(Icons.person, color: Colors.white, size: 20),
+    return RefreshIndicator(
+      color: widget.primaryBlue,
+      onRefresh: _fetchDashboardData,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 80,
+            floating: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [widget.primaryBlue, widget.secondaryBlue]
                 ),
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => StudentProfile(userData: widget.userData))),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
               ),
             ),
-          ],
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              const SizedBox(height: 10),
-              _buildSectionHeader("Overview"),
-              _buildIdentityCard(widget.userData),
-              const SizedBox(height: 20),
-              _buildResidenceInfo(),
-              const SizedBox(height: 25),
-              _buildSectionHeader("Hostel Services"),
-              _buildBentoGrid(context, widget.userData),
-              const SizedBox(height: 25),
-              _buildSectionHeader("Primary Support"),
-              _buildWardenQuickLink(context, widget.userData, widget.primaryIndigo),
-              const SizedBox(height: 100),
-            ]),
+            leading: IconButton(
+              icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
+            ),
+            title: const Text("SAHYOG PORTAL",
+                style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontSize: 18,
+                    color: Colors.white)),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: IconButton(
+                  icon: const CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white24,
+                    child: Icon(Icons.person_outline_rounded, color: Colors.white, size: 20),
+                  ),
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => StudentProfile(userData: widget.userData))),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const SizedBox(height: 10),
+                FadeInDown(duration: const Duration(milliseconds: 500), child: _buildSectionHeader("Overview")),
+                FadeInDown(duration: const Duration(milliseconds: 600), child: _buildIdentityCard()),
+                const SizedBox(height: 20),
+                FadeInDown(duration: const Duration(milliseconds: 700), child: _buildResidenceInfo()),
+                const SizedBox(height: 25),
+                FadeInDown(duration: const Duration(milliseconds: 800), child: _buildSectionHeader("Hostel Services")),
+                _buildBentoGrid(context, widget.userData),
+                const SizedBox(height: 25),
+                FadeInDown(duration: const Duration(milliseconds: 900), child: _buildSectionHeader("Primary Support")),
+                _buildManagerList(),
+                const SizedBox(height: 100),
+              ]),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -258,31 +296,59 @@ class _HomeContentState extends State<_HomeContent> {
       padding: const EdgeInsets.only(left: 4, bottom: 12),
       child: Text(title,
           style: const TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
+              fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
     );
   }
 
-  Widget _buildIdentityCard(Map<String, String> userData) {
+  Widget _buildIdentityCard() {
+    String name = _isLoadingHostel ? "..." : (_hostelData?.data?.studentName ?? widget.userData['name'] ?? "Student");
+    String hostelName = _isLoadingHostel ? "Fetching Hostel..." : (_hostelData?.data?.hostelName ?? "No Hostel Assigned");
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF6A11CB), Color(0xFF2575FC)]),
+        gradient: LinearGradient(
+          colors: [widget.primaryBlue, widget.secondaryBlue.withBlue(150)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: widget.primaryBlue.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ]
       ),
       child: Padding(
         padding: const EdgeInsets.all(22),
         child: Row(
           children: [
-            const CircleAvatar(radius: 35, backgroundColor: Colors.white24, child: Icon(Icons.school, color: Colors.white, size: 35)),
+            const CircleAvatar(
+              radius: 35, 
+              backgroundColor: Colors.white12, 
+              child: Icon(Icons.school_rounded, color: Colors.white, size: 35)
+            ),
             const SizedBox(width: 18),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Hi, ${userData['name'] ?? "Student"}",
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                const Text("Status: Verified Student",
-                    style: TextStyle(color: Colors.white70, fontSize: 14)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Hi, $name",
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(hostelName,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: const Text("VERIFIED STUDENT",
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -291,15 +357,14 @@ class _HomeContentState extends State<_HomeContent> {
   }
 
   Widget _buildResidenceInfo() {
-    // UPDATED: Mapping correctly to your JSON response keys
     String roomNo = _isLoadingRoom ? "..." : (_roomData?.data?.roomNumber ?? "N/A");
     String bedNo = _isLoadingRoom ? "..." : (_roomData?.data?.bedNumber ?? "N/A");
 
     return Row(
       children: [
-        Expanded(child: _infoTile(" ROOM NO", roomNo, Icons.meeting_room, const Color(0xFFFF9800))),
+        Expanded(child: _infoTile("ROOM NO", roomNo, Icons.meeting_room_rounded, widget.primaryBlue)),
         const SizedBox(width: 15),
-        Expanded(child: _infoTile("BED NO", bedNo, Icons.bed_rounded, const Color(0xFF4CAF50))),
+        Expanded(child: _infoTile("BED NO", bedNo, Icons.bed_rounded, widget.secondaryBlue)),
       ],
     );
   }
@@ -307,13 +372,18 @@ class _HomeContentState extends State<_HomeContent> {
   Widget _infoTile(String label, String val, IconData icon, Color col) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.grey.shade100)
+      ),
       child: Column(
         children: [
           Icon(icon, color: col, size: 28),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-          Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF3F51B5))),
+          const SizedBox(height: 10),
+          Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(val, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: widget.primaryBlue)),
         ],
       ),
     );
@@ -328,17 +398,13 @@ class _HomeContentState extends State<_HomeContent> {
       crossAxisSpacing: 14,
       mainAxisSpacing: 14,
       children: [
-        _bentoItem(context, "Leave", Icons.holiday_village, const Color(0xFF6366F1), 
+        _bentoItem(context, "Leave", Icons.holiday_village_rounded, widget.primaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => LeaveHistoryPage(userId: userId)))),
-        _bentoItem(context, "Mess", Icons.restaurant, const Color(0xFFF59E0B), 
-          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MessMenuPage()))),
-        _bentoItem(context, "Payments", Icons.account_balance_wallet, const Color(0xFFEC4899), 
+        _bentoItem(context, "Payments", Icons.account_balance_wallet_rounded, widget.secondaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage()))),
-        _bentoItem(context, "Complaints", Icons.assignment_late, const Color(0xFFEF4444), 
-          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage()))),
-        _bentoItem(context, "Support", Icons.support_agent, const Color(0xFF10B981), 
+        _bentoItem(context, "Support", Icons.support_agent_rounded, widget.primaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServiceDeskPage()))),
-        _bentoItem(context, "Notice", Icons.campaign, const Color(0xFF8B5CF6), 
+        _bentoItem(context, "Notice", Icons.campaign_rounded, widget.secondaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticePage()))),
       ],
     );
@@ -351,28 +417,67 @@ class _HomeContentState extends State<_HomeContent> {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(25),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: color)),
-          ],
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.grey.shade100)
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 12),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: 14)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildWardenQuickLink(BuildContext context, Map<String, String> userData, Color primaryIndigo) {
-    return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25)),
-      child: ListTile(
-        leading: CircleAvatar(backgroundColor: primaryIndigo.withOpacity(0.1), child: Icon(Icons.person_4, color: primaryIndigo)),
-        title: const Text("Mrs. Sunita Sharma", style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: const Text("Block Warden | Available"),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WardenChatScreen(userData: userData))),
-      ),
+  Widget _buildManagerList() {
+    if (_isLoadingHostel) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final managers = _hostelData?.data?.assignedManagers ?? [];
+
+    if (managers.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+        child: const Center(child: Text("No assigned managers found")),
+      );
+    }
+
+    return Column(
+      children: managers.map((manager) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white, 
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.grey.shade100)
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: widget.primaryBlue.withOpacity(0.1), 
+              child: Icon(Icons.person_4_rounded, color: widget.primaryBlue)
+            ),
+            title: Text("${manager.firstName} ${manager.lastName}", 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            subtitle: Text("Hostel Manager | ${manager.mobile}", 
+              style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WardenChatScreen(userData: widget.userData))),
+          ),
+        ),
+      )).toList(),
     );
   }
 }
@@ -387,7 +492,7 @@ class LeavePage extends StatefulWidget {
 }
 
 class _LeavePageState extends State<LeavePage> {
-  final Color primaryColor = const Color(0xFF6366F1);
+  final Color primaryColor = const Color(0xFF1A237E);
   final TextEditingController _reasonController = TextEditingController();
   bool isSingleDay = true;
   DateTime selectedDate = DateTime.now();
@@ -420,7 +525,7 @@ class _LeavePageState extends State<LeavePage> {
           ? selectedDate.toIso8601String()
           : selectedRange!.end.toIso8601String();
 
-      final response = await apiService.applyLeave(
+      await apiService.applyLeave(
         userId: _getUserId(),
         leaveType: isSingleDay ? "Casual" : "Medical",
         startDate: startDate,
@@ -450,14 +555,14 @@ class _LeavePageState extends State<LeavePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
-      appBar: AppBar(title: const Text("Leave Portal"), backgroundColor: primaryColor, foregroundColor: Colors.white),
+      appBar: AppBar(title: const Text("Leave Portal"), backgroundColor: primaryColor, foregroundColor: Colors.white, elevation: 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
               child: Row(
                 children: [
                   _toggleBtn("One Day", isSingleDay, () => setState(() => isSingleDay = true)),
@@ -466,14 +571,36 @@ class _LeavePageState extends State<LeavePage> {
               ),
             ),
             const SizedBox(height: 25),
-            isSingleDay ? CalendarDatePicker(initialDate: selectedDate, firstDate: DateTime.now(), lastDate: DateTime(2027), onDateChanged: (d) => setState(() => selectedDate = d)) : _rangePicker(),
+            Container(
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+              padding: const EdgeInsets.all(10),
+              child: isSingleDay 
+                ? CalendarDatePicker(initialDate: selectedDate, firstDate: DateTime.now(), lastDate: DateTime(2027), onDateChanged: (d) => setState(() => selectedDate = d)) 
+                : _rangePicker(),
+            ),
             const SizedBox(height: 25),
-            TextField(controller: _reasonController, maxLines: 4, decoration: InputDecoration(hintText: "Reason for leave...", filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none))),
+            TextField(
+              controller: _reasonController, 
+              maxLines: 4, 
+              decoration: InputDecoration(
+                hintText: "Reason for leave...", 
+                filled: true, 
+                fillColor: Colors.white, 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.shade200)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.shade200)),
+              )
+            ),
             const SizedBox(height: 30),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor, 
+                minimumSize: const Size(double.infinity, 60), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 5,
+                shadowColor: primaryColor.withOpacity(0.4)
+              ),
               onPressed: _loading ? null : _submit,
-              child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text("SEND APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text("SEND APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
             )
           ],
         ),
@@ -482,22 +609,39 @@ class _LeavePageState extends State<LeavePage> {
   }
 
   Widget _toggleBtn(String text, bool active, VoidCallback tap) {
-    return Expanded(child: GestureDetector(onTap: tap, child: AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: active ? primaryColor : Colors.transparent, borderRadius: BorderRadius.circular(10)), child: Center(child: Text(text, style: TextStyle(color: active ? Colors.white : Colors.black, fontWeight: FontWeight.bold))))));
+    return Expanded(
+      child: GestureDetector(
+        onTap: tap, 
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300), 
+          padding: const EdgeInsets.symmetric(vertical: 12), 
+          decoration: BoxDecoration(color: active ? primaryColor : Colors.transparent, borderRadius: BorderRadius.circular(10)), 
+          child: Center(child: Text(text, style: TextStyle(color: active ? Colors.white : Colors.black54, fontWeight: FontWeight.bold)))
+        )
+      )
+    );
   }
 
   Widget _rangePicker() {
     return InkWell(
       onTap: () async {
-        final r = await showDateRangePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime(2027));
+        final r = await showDateRangePicker(
+          context: context, 
+          firstDate: DateTime.now(), 
+          lastDate: DateTime(2027),
+          builder: (context, child) {
+            return Theme(data: ThemeData.light().copyWith(colorScheme: ColorScheme.light(primary: primaryColor)), child: child!);
+          }
+        );
         if (r != null) setState(() => selectedRange = r);
       },
       child: Container(
         height: 150, width: double.infinity,
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.date_range, size: 50, color: Color(0xFF6366F1)),
+          Icon(Icons.date_range_rounded, size: 50, color: primaryColor),
           const SizedBox(height: 10),
-          Text(selectedRange == null ? "Select From - To Date" : "${DateFormat('dd MMM').format(selectedRange!.start)} - ${DateFormat('dd MMM').format(selectedRange!.end)}", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(selectedRange == null ? "Select From - To Date" : "${DateFormat('dd MMM').format(selectedRange!.start)} - ${DateFormat('dd MMM').format(selectedRange!.end)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ]),
       ),
     );
@@ -509,26 +653,36 @@ class AttendancePage extends StatelessWidget {
   const AttendancePage({super.key});
   @override
   Widget build(BuildContext context) {
+    const Color primaryBlue = Color(0xFF1A237E);
     return Scaffold(
-      appBar: AppBar(title: const Text("Attendance Log"), backgroundColor: const Color(0xFF1A237E), foregroundColor: Colors.white),
+      appBar: AppBar(title: const Text("Attendance Log"), backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0),
       body: Column(
         children: [
           const SizedBox(height: 30),
-          _buildProgressCircle(),
+          _buildProgressCircle(primaryBlue),
           const SizedBox(height: 30),
-          const Text("Monthly Record", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("Monthly Record", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryBlue)),
+          const SizedBox(height: 10),
           Expanded(
             child: Container(
-              margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.indigo.shade50, borderRadius: const BorderRadius.vertical(top: Radius.circular(40))),
+              margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                color: Colors.white, 
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))]
+              ),
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 10, crossAxisSpacing: 10),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 12, crossAxisSpacing: 12),
                 itemCount: 30,
                 itemBuilder: (ctx, i) {
                   bool isPresent = i % 7 != 0;
                   return Container(
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: isPresent ? Colors.green : Colors.red, width: 2)),
-                    child: Center(child: Text("${i+1}", style: TextStyle(color: isPresent ? Colors.green : Colors.red, fontWeight: FontWeight.bold))),
+                    decoration: BoxDecoration(
+                      color: isPresent ? primaryBlue.withOpacity(0.05) : Colors.red.withOpacity(0.05), 
+                      borderRadius: BorderRadius.circular(12), 
+                      border: Border.all(color: isPresent ? primaryBlue.withOpacity(0.2) : Colors.red.withOpacity(0.2), width: 1)
+                    ),
+                    child: Center(child: Text("${i+1}", style: TextStyle(color: isPresent ? primaryBlue : Colors.red, fontWeight: FontWeight.bold))),
                   );
                 },
               ),
@@ -539,69 +693,17 @@ class AttendancePage extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressCircle() {
+  Widget _buildProgressCircle(Color color) {
     return Stack(
       alignment: Alignment.center,
       children: [
-        SizedBox(height: 150, width: 150, child: CircularProgressIndicator(value: 0.94, strokeWidth: 12, color: Colors.indigo, backgroundColor: Colors.indigo.withOpacity(0.1))),
-        const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text("94%", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)), Text("OVERALL")]),
+        SizedBox(height: 160, width: 160, child: CircularProgressIndicator(value: 0.94, strokeWidth: 14, color: color, backgroundColor: color.withOpacity(0.1), strokeCap: StrokeCap.round)),
+        Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Text("94%", style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A237E))),
+          Text("ATTENDANCE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600, letterSpacing: 1)),
+        ]),
       ],
     );
-  }
-}
-
-// --- MODULE 3: MESS MENU ---
-class MessMenuPage extends StatefulWidget {
-  const MessMenuPage({super.key});
-  @override
-  State<MessMenuPage> createState() => _MessMenuPageState();
-}
-
-class _MessMenuPageState extends State<MessMenuPage> {
-  int _selectedDayIndex = 0;
-  final Color primaryAmber = const Color(0xFFFFB300);
-  final List<Map<String, String>> menu = [
-    {"day": "Monday", "b": "Aloo Paratha", "l": "Rajma Rice", "d": "Mix Veg"},
-    {"day": "Tuesday", "b": "Poha & Tea", "l": "Kadhi Pakoda", "d": "Paneer Butter"},
-    {"day": "Wednesday", "b": "Idli Sambhar", "l": "Veg Biryani", "d": "Dal Tadka"},
-    {"day": "Thursday", "b": "Upma", "l": "Chole Bhature", "d": "Egg Curry"},
-    {"day": "Friday", "b": "Bread Butter", "l": "Aloo Gobhi", "d": "Chicken/Soya"},
-    {"day": "Saturday", "b": "Puri Sabzi", "l": "Dal Makhani", "d": "Kofta"},
-    {"day": "Sunday", "b": "Special Breakfast", "l": "Special Veg", "d": "Special Feast"},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFFDF5),
-      appBar: AppBar(elevation: 0, backgroundColor: Colors.transparent, centerTitle: true, leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black), onPressed: () => Navigator.pop(context)), title: const Text("WEEKLY MENU", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900))),
-      body: Column(
-        children: [
-          _buildDaySelector(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Column(children: [
-                _buildMealCard("Breakfast", menu[_selectedDayIndex]['b']!, Icons.wb_twilight_rounded, "08:00 AM", const Color(0xFF4FC3F7), 0),
-                _buildMealCard("Lunch", menu[_selectedDayIndex]['l']!, Icons.wb_sunny_rounded, "01:00 PM", const Color(0xFFFF8A65), 200),
-                _buildMealCard("Dinner", menu[_selectedDayIndex]['d']!, Icons.nightlight_round, "08:00 PM", const Color(0xFF7986CB), 400),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDaySelector() {
-    return SizedBox(height: 90, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: menu.length, padding: const EdgeInsets.symmetric(horizontal: 15), itemBuilder: (ctx, index) {
-      bool isSelected = _selectedDayIndex == index;
-      return GestureDetector(onTap: () => setState(() => _selectedDayIndex = index), child: AnimatedContainer(duration: const Duration(milliseconds: 300), width: 70, margin: const EdgeInsets.all(10), decoration: BoxDecoration(color: isSelected ? primaryAmber : Colors.white, borderRadius: BorderRadius.circular(20)), child: Center(child: Text(menu[index]['day']!.substring(0,3).toUpperCase(), style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)))));
-    }));
-  }
-
-  Widget _buildMealCard(String type, String dish, IconData icon, String time, Color accent, int delay) {
-    return FadeInRight(duration: const Duration(milliseconds: 500), delay: Duration(milliseconds: delay), child: Container(margin: const EdgeInsets.only(bottom: 20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25)), child: Row(children: [Icon(icon, color: accent), const SizedBox(width: 20), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: TextStyle(color: accent, fontWeight: FontWeight.bold)), Text(dish, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))]), const Spacer(), Text(time, style: const TextStyle(color: Colors.grey))])));
   }
 }
 
@@ -610,24 +712,57 @@ class PaymentsPage extends StatelessWidget {
   const PaymentsPage({super.key});
   @override
   Widget build(BuildContext context) {
-    const Color pink = Color(0xFFEC4899);
+    const Color primaryBlue = Color(0xFF1A237E);
     return Scaffold(
-      backgroundColor: const Color(0xFFFDF2F8),
-      appBar: AppBar(title: const Text("Fee Status"), backgroundColor: pink, foregroundColor: Colors.white),
+      backgroundColor: const Color(0xFFF4F7FA),
+      appBar: AppBar(title: const Text("Fee Management"), backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(children: [
           _feeCard("Hostel Accommodation", "50,000", "PAID", Colors.green),
           _feeCard("Mess Charges (Term 1)", "12,000", "PENDING", Colors.orange),
           const Spacer(),
-          ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: pink, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text("PROCEED TO PAY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))
+          ElevatedButton(
+            onPressed: () {}, 
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryBlue, 
+              minimumSize: const Size(double.infinity, 65), 
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 8,
+              shadowColor: primaryBlue.withOpacity(0.4)
+            ), 
+            child: const Text("PROCEED TO PAY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1))
+          )
         ]),
       ),
     );
   }
 
   Widget _feeCard(String title, String amt, String status, Color col) {
-    return Container(margin: const EdgeInsets.only(bottom: 15), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text("₹ $amt", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))]), Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: col.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Text(status, style: TextStyle(color: col, fontWeight: FontWeight.bold)))]));
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16), 
+      padding: const EdgeInsets.all(22), 
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))]
+      ), 
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+        children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
+            const SizedBox(height: 4),
+            Text("₹ $amt", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF1A237E)))
+          ]), 
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), 
+            decoration: BoxDecoration(color: col.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), 
+            child: Text(status, style: TextStyle(color: col, fontWeight: FontWeight.w900, fontSize: 11))
+          )
+        ]
+      )
+    );
   }
 }
 
@@ -636,3 +771,4 @@ class NoticePage extends StatelessWidget { const NoticePage({super.key}); @overr
 class RaiseComplaintPage extends StatelessWidget { const RaiseComplaintPage({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Complaints"))); }
 class ServiceDeskPage extends StatelessWidget { const ServiceDeskPage({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Support"))); }
 class SettingsPage extends StatelessWidget { const SettingsPage({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Settings"))); }
+class MessMenuPage extends StatelessWidget { const MessMenuPage({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Mess Menu"))); }

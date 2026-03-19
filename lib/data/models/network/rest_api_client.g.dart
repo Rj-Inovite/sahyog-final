@@ -58,7 +58,7 @@ class _RestAPIClient implements RestAPIClient {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'wardens',
+            'manager/warden-list',
             queryParameters: queryParameters,
             data: _data,
           )

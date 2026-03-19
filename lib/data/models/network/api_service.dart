@@ -2,20 +2,21 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/data/models/my_hostel_info_response.dart';
 
 // --- MODELS ---
 import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
-// ADD THIS IMPORT:
 import 'package:my_app/data/models/network/my_room_response.dart'; 
+// ADD THIS IMPORT (Ensure the path matches where you saved Step 1 from previous message)
+
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
 import 'auth_local_storage.dart';
 
 /// --- AUTH INTERCEPTOR ---
-/// Automatically attaches the Bearer token to every request
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -28,7 +29,6 @@ class AuthInterceptor extends Interceptor {
       debugPrint("AuthInterceptor Error: $e");
     }
     
-    // Standard Sahyog API Headers
     options.headers['Accept'] = 'application/json';
     options.headers['Content-Type'] = 'application/json';
     
@@ -56,7 +56,6 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 30),
     ));
 
-    // Adding Interceptors for Auth and Logging
     _dio.interceptors.add(AuthInterceptor());
     
     _dio.interceptors.add(LogInterceptor(
@@ -69,56 +68,76 @@ class ApiService {
     client = RestAPIClient(_dio);
   }
 
+  // ================= STUDENT HOSTEL INFO API =================
+
+  /// Fetches the hostel info, including assigned managers for the student
+  Future<MyHostelInfoResponse?> getMyHostelInfo() async {
+    try {
+      final response = await _dio.get("my-hostel-info");
+      if (response.statusCode == 200 && response.data != null) {
+        return MyHostelInfoResponse.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching My Hostel Info: $e");
+      return null;
+    }
+  }
+
   // ================= MANAGER / WARDEN APIS =================
 
   /// Fetches the list of students for the warden/manager
   Future<StudentListResponse?> getStudentList() async {
     try {
-      final response = await client.getStudentList();
-      return response;
+      final response = await _dio.get("manager/student-list");
+      if (response.statusCode == 200 && response.data != null) {
+        return StudentListResponse.fromJson(response.data);
+      }
+      return null;
     } catch (e) {
-      debugPrint("Error fetching Student List from Client: $e");
+      debugPrint("Error fetching Student List: $e");
       return null;
     }
   }
 
-  /// NEW: WARDEN LIST API (Staff Management)
+  /// FIXED: WARDEN LIST API
   Future<WardenListResponse?> getWardenList() async {
     try {
-      final response = await _dio.get("wardens");
-      if (response.data != null && response.data is Map<String, dynamic>) {
+      final response = await _dio.get("manager/warden-list"); 
+      
+      if (response.statusCode == 200 && response.data != null) {
         return WardenListResponse.fromJson(response.data);
       }
       return null;
     } catch (e) {
-      debugPrint("Error fetching Warden List: $e");
+      debugPrint("Error fetching Warden List (trying manager/warden-list): $e");
+      try {
+        final retryResponse = await _dio.get("wardens");
+        if (retryResponse.statusCode == 200 && retryResponse.data != null) {
+          return WardenListResponse.fromJson(retryResponse.data);
+        }
+      } catch (_) {}
       return null;
     }
   }
 
   // ================= STUDENT ROOM & DASHBOARD =================
 
-  /// NEW: Fetches the room allotment details for the logged-in student.
-  /// Used in student.dart to show room details or "No Room Assigned" message.
   Future<MyRoomResponse?> getMyRoomDetails() async {
     try {
-      // Direct call to my-room endpoint. AuthInterceptor handles the token.
       final response = await _dio.get("my-room");
-      
       if (response.data != null && response.data is Map<String, dynamic>) {
         return MyRoomResponse.fromJson(response.data);
       }
       return null;
     } catch (e) {
       debugPrint("Error fetching My Room Details: $e");
-      // We return null so the UI can handle the error state gracefully
       return null;
     }
   }
 
   // ================= STUDENT PROFILE VIEW =================
 
-  /// Fetches detailed student data from the web dashboard
   Future<dynamic> getStudentProfileView(int studentId) async {
     try {
       final response = await client.getStudentView(studentId);
@@ -131,7 +150,6 @@ class ApiService {
 
   // ================= BIOMETRIC / REGISTRATION APIS =================
 
-  /// Fetches students who are pending face enrollment
   Future<Map<String, dynamic>> getPendingEnrollments() async {
     try {
       final response = await _dio.get("public/pending-enrollment");
@@ -145,7 +163,6 @@ class ApiService {
     }
   }
 
-  /// Submits the generated Face Vector to the Sahyog server
   Future<dynamic> submitEnrollment(int studentId, List<double> faceVector) async {
     try {
       final payload = {
@@ -202,7 +219,7 @@ class ApiService {
     return await client.applyLeave(payload);
   }
 
-  // ================= CHAT APIS (ELABORATED) =================
+  // ================= CHAT APIS =================
 
   Future<dynamic> setupChat() async {
     try {
@@ -273,5 +290,4 @@ class ApiService {
   }
 }
 
-// Global instance to be used across the app
 final apiService = ApiService();

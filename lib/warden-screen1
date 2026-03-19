@@ -29,12 +29,12 @@ class WardenDashboard extends StatefulWidget {
 
 class _WardenDashboardState extends State<WardenDashboard> {
   int _currentIndex = 0;
-
   late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    // Initialize pages and pass the logged-in userData to the Home Console
     _pages = [
       ConsoleHome(userData: widget.userData),
       const StudentDirectoryPage(), 
@@ -64,10 +64,15 @@ class _WardenDashboardState extends State<WardenDashboard> {
               backgroundColor: Colors.white.withOpacity(0.2),
               child: IconButton(
                 icon: const Icon(Icons.person_outline_rounded, color: Colors.white),
-                onPressed: () => Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const WardenProfilePage())
-                ),
+                onPressed: () {
+                  // CORRECTED: Passing widget.userData so the profile knows who is logged in
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => WardenProfilePage(userData: widget.userData)
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -151,7 +156,9 @@ class ConsoleHome extends StatelessWidget {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          Text("${userData['name'] ?? 'Warden'}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          // CORRECTED: Pulls the correct name (e.g., Anjali) dynamically
+          Text("${userData['name'] ?? 'Warden'}", 
+            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -364,6 +371,7 @@ class ComplaintManagementPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Maintenance Tickets"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -426,6 +434,7 @@ class RoomInventoryPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Hostel Bed Layout"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -471,6 +480,7 @@ class AttendancePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Daily Attendance"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -534,6 +544,7 @@ class GateRecordsPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Campus Access Log"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -603,6 +614,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
       appBar: AppBar(
         title: const Text("Staff Directory"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -650,6 +662,7 @@ class OccupancyStatsPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Hostel Utilization"), 
         backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -742,5 +755,5 @@ class WardenInboxPage extends StatelessWidget {
 class AdminSetupPage extends StatelessWidget {
   const AdminSetupPage({super.key});
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [const ListTile(leading: Icon(Icons.sync_lock_rounded), title: Text("Force System Sync")), const Divider(), ListTile(leading: const Icon(Icons.logout_rounded, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.pop(context))]);
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [const ListTile(leading: Icon(Icons.sync_lock_rounded), title: Text("Force System Sync")), const Divider(), ListTile(leading: const Icon(Icons.logout_rounded, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false))]);
 }

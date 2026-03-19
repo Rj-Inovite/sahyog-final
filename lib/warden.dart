@@ -65,7 +65,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
               child: IconButton(
                 icon: const Icon(Icons.person_outline_rounded, color: Colors.white),
                 onPressed: () {
-                  // CORRECTED: Passing widget.userData so the profile knows who is logged in
+                  // Integration: Opens the Warden Profile from the shared API structure
                   Navigator.push(
                     context, 
                     MaterialPageRoute(
@@ -156,7 +156,6 @@ class ConsoleHome extends StatelessWidget {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          // CORRECTED: Pulls the correct name (e.g., Anjali) dynamically
           Text("${userData['name'] ?? 'Warden'}", 
             style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
           const SizedBox(height: 20),
@@ -296,7 +295,7 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
         }
       }
     } catch (e) {
-      debugPrint("Sahyog Sync Error: $e");
+      debugPrint("Sahyog Student Sync Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -355,6 +354,98 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
           child: Text(student.status.toUpperCase(), 
               style: TextStyle(color: student.status.toLowerCase() == 'active' ? successGreen : Colors.grey, fontSize: 10, fontWeight: FontWeight.w900)),
         ),
+      ),
+    );
+  }
+}
+
+// --- SECTION 7: STAFF MANAGEMENT (WARDEN API INTEGRATED) ---
+class StaffManagementPage extends StatefulWidget {
+  const StaffManagementPage({super.key});
+  @override
+  State<StaffManagementPage> createState() => _StaffManagementPageState();
+}
+
+class _StaffManagementPageState extends State<StaffManagementPage> {
+  List<Warden> _wardens = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWardens();
+  }
+
+  Future<void> _fetchWardens() async {
+    try {
+      final response = await apiService.getWardenList();
+      if (response != null && (response.success ?? false)) {
+        if (mounted) {
+          setState(() { 
+            // Corrected to use the nullable safe 'data' from your WardenListResponse model
+            _wardens = response.data ?? []; 
+            _isLoading = false; 
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Staff Fetch Error (Sahyog API): $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      appBar: AppBar(
+        title: const Text("Staff Directory", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
+        backgroundColor: sunsetOrange,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: sunsetOrange)) 
+        : RefreshIndicator(
+            onRefresh: _fetchWardens,
+            color: sunsetOrange,
+            child: _wardens.isEmpty
+              ? const Center(child: Text("No Staff Members Found"))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: _wardens.length,
+                  itemBuilder: (ctx, i) => _buildWardenTile(_wardens[i]),
+                ),
+          ),
+    );
+  }
+
+  Widget _buildWardenTile(Warden warden) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 10, offset: Offset(0, 4))],
+      ),
+      child: ListTile(
+        leading: const CircleAvatar(
+          backgroundColor: sunsetOrange, 
+          child: Icon(Icons.verified_user_rounded, color: Colors.white, size: 20)
+        ),
+        // Uses 'wardenName' from your @JsonKey mapping
+        title: Text(warden.wardenName ?? "Unknown Warden", style: const TextStyle(fontWeight: FontWeight.w900)),
+        subtitle: Text("${warden.email ?? ''} | ${warden.mobile ?? ''}", style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+        onTap: () {
+          // Future expansion: Detailed Warden View
+        },
       ),
     );
   }
@@ -497,7 +588,7 @@ class AttendancePage extends StatelessWidget {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Batch", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("March 18, 2026", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Batch", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("March 19, 2026", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Status", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("78% Present", style: TextStyle(color: sunsetOrange, fontWeight: FontWeight.bold, fontSize: 16))]),
               ],
             ),
@@ -570,83 +661,6 @@ class GateRecordsPage extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-
-// --- SECTION 7: STAFF MANAGEMENT (WITH PULL-TO-REFRESH) ---
-class StaffManagementPage extends StatefulWidget {
-  const StaffManagementPage({super.key});
-  @override
-  State<StaffManagementPage> createState() => _StaffManagementPageState();
-}
-
-class _StaffManagementPageState extends State<StaffManagementPage> {
-  List<Warden> _wardens = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchWardens();
-  }
-
-  Future<void> _fetchWardens() async {
-    try {
-      final response = await apiService.getWardenList();
-      if (response != null && response.success) {
-        if (mounted) {
-          setState(() { 
-            _wardens = response.data; 
-            _isLoading = false; 
-          });
-        }
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Staff Directory"), 
-        backgroundColor: sunsetOrange,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: sunsetOrange)) 
-        : RefreshIndicator(
-            onRefresh: _fetchWardens,
-            color: sunsetOrange,
-            child: _wardens.isEmpty
-              ? const Center(child: Text("No Staff Members Found"))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(20),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: _wardens.length,
-                  itemBuilder: (ctx, i) => Container(
-                    margin: const EdgeInsets.only(bottom: 15),
-                    decoration: BoxDecoration(
-                      color: Colors.white, 
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 10, offset: Offset(0, 4))],
-                    ),
-                    child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: sunsetOrange, child: Icon(Icons.verified_user_rounded, color: Colors.white, size: 20)),
-                      title: Text("${_wardens[i].firstName} ${_wardens[i].lastName}", style: const TextStyle(fontWeight: FontWeight.w900)),
-                      subtitle: Text(_wardens[i].email, style: const TextStyle(fontSize: 12)),
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-                    ),
-                  ),
-                ),
-          ),
     );
   }
 }
