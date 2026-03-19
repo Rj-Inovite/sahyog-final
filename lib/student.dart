@@ -56,9 +56,9 @@ class _StudentDashboardState extends State<StudentDashboard>
   int _currentIndex = 0;
   late PageController _pageController;
 
-  final Color primaryBlue = const Color(0xFF1A237E);
-  final Color secondaryBlue = const Color(0xFF283593);
-  final Color accentBlue = const Color(0xFF3949AB);
+  final Color primaryBlue = const Color.fromARGB(255, 146, 6, 99);
+  final Color secondaryBlue = const Color.fromRGBO(167, 5, 105, 1);
+  final Color accentBlue = const Color.fromRGBO(173, 5, 137, 1);
   final Color softBg = const Color(0xFFF4F7FA);
 
   @override
@@ -132,8 +132,6 @@ class _StudentDashboardState extends State<StudentDashboard>
                 icon: Icon(Icons.calendar_month_rounded), label: "Attendance"),
             BottomNavigationBarItem(
                 icon: Icon(Icons.forum_rounded), label: "Inbox"),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.tune_rounded), label: "Settings"),
           ],
         ),
       ),
@@ -492,7 +490,7 @@ class LeavePage extends StatefulWidget {
 }
 
 class _LeavePageState extends State<LeavePage> {
-  final Color primaryColor = const Color(0xFF1A237E);
+  final Color primaryColor = const Color.from(alpha: 1, red: 0.773, green: 0.082, blue: 0.506);
   final TextEditingController _reasonController = TextEditingController();
   bool isSingleDay = true;
   DateTime selectedDate = DateTime.now();
@@ -653,9 +651,9 @@ class AttendancePage extends StatelessWidget {
   const AttendancePage({super.key});
   @override
   Widget build(BuildContext context) {
-    const Color primaryBlue = Color(0xFF1A237E);
+    const Color primaryBlue = Color.from(alpha: 1, red: 0.647, green: 0.02, blue: 0.49);
     return Scaffold(
-      appBar: AppBar(title: const Text("Attendance Log"), backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0),
+      appBar: AppBar(title: const Text("Attendance Log"), backgroundColor: const Color.fromRGBO(194, 12, 124, 1), foregroundColor: Colors.white, elevation: 0),
       body: Column(
         children: [
           const SizedBox(height: 30),
@@ -682,7 +680,7 @@ class AttendancePage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12), 
                       border: Border.all(color: isPresent ? primaryBlue.withOpacity(0.2) : Colors.red.withOpacity(0.2), width: 1)
                     ),
-                    child: Center(child: Text("${i+1}", style: TextStyle(color: isPresent ? primaryBlue : Colors.red, fontWeight: FontWeight.bold))),
+                    child: Center(child: Text("${i+1}", style: TextStyle(color: isPresent ? const Color.fromRGBO(148, 17, 109, 1) : Colors.red, fontWeight: FontWeight.bold))),
                   );
                 },
               ),
@@ -712,10 +710,10 @@ class PaymentsPage extends StatelessWidget {
   const PaymentsPage({super.key});
   @override
   Widget build(BuildContext context) {
-    const Color primaryBlue = Color(0xFF1A237E);
+    const Color primaryBlue = Color.fromRGBO(187, 23, 146, 1);
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
-      appBar: AppBar(title: const Text("Fee Management"), backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0),
+      appBar: AppBar(title: const Text("Fee Management"), backgroundColor: const Color.fromRGBO(204, 30, 175, 1), foregroundColor: Colors.white, elevation: 0),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(children: [
@@ -725,11 +723,11 @@ class PaymentsPage extends StatelessWidget {
           ElevatedButton(
             onPressed: () {}, 
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryBlue, 
+              backgroundColor: const Color.fromRGBO(153, 19, 119, 1), 
               minimumSize: const Size(double.infinity, 65), 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 8,
-              shadowColor: primaryBlue.withOpacity(0.4)
+              shadowColor: const Color.fromRGBO(148, 15, 115, 1).withOpacity(0.4)
             ), 
             child: const Text("PROCEED TO PAY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1))
           )
@@ -753,7 +751,7 @@ class PaymentsPage extends StatelessWidget {
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 4),
-            Text("₹ $amt", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF1A237E)))
+            Text("₹ $amt", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color.from(alpha: 1, red: 0.678, green: 0.047, blue: 0.435)))
           ]), 
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), 

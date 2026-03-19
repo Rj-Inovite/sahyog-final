@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:my_app/data/models/my_hostel_info_response.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 import 'package:animate_do/animate_do.dart';
 
@@ -11,10 +12,11 @@ import 'login.dart';
 import 'student_profile.dart';
 import 'warden_chat_screen.dart';
 import 'leave_history_page.dart';
-// Model for Room Details
+
+// --- MODELS LAYER ---
 import 'package:my_app/data/models/network/my_room_response.dart';
 
-// --- DATA & MODELS LAYER ---
+
 class ChatData {
   static List<Map<String, dynamic>> messages = [
     {
@@ -54,11 +56,10 @@ class _StudentDashboardState extends State<StudentDashboard>
   int _currentIndex = 0;
   late PageController _pageController;
 
-  // --- REFINED PROFESSIONAL BLUE THEME ---
-  final Color primaryBlue = const Color(0xFF1A237E); // Deep Midnight Indigo
-  final Color secondaryBlue = const Color(0xFF283593); // Royal Blue
-  final Color accentBlue = const Color(0xFF3949AB); // Professional Indigo
-  final Color softBg = const Color(0xFFF4F7FA); // Clean Soft Grey-Blue Background
+  final Color primaryBlue = const Color(0xFF1A237E);
+  final Color secondaryBlue = const Color(0xFF283593);
+  final Color accentBlue = const Color(0xFF3949AB);
+  final Color softBg = const Color(0xFFF4F7FA);
 
   @override
   void initState() {
@@ -140,7 +141,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   }
 }
 
-// --- MODULE: HOME CONTENT (HANDLES ROOM API VIA TOKEN) ---
+// --- MODULE: HOME CONTENT (HANDLES ROOM & HOSTEL API + REFRESH) ---
 class _HomeContent extends StatefulWidget {
   final Map<String, String> userData;
   final Color primaryBlue;
@@ -157,12 +158,27 @@ class _HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<_HomeContent> {
   bool _isLoadingRoom = true;
+  bool _isLoadingHostel = true;
   MyRoomResponse? _roomData;
+  MyHostelInfoResponse? _hostelData;
 
   @override
   void initState() {
     super.initState();
-    _fetchRoomDetails();
+    _fetchDashboardData();
+  }
+
+  // Logic to refresh all dashboard data
+  Future<void> _fetchDashboardData() async {
+    setState(() {
+      _isLoadingRoom = true;
+      _isLoadingHostel = true;
+    });
+    
+    await Future.wait([
+      _fetchRoomDetails(),
+      _fetchHostelInfo(),
+    ]);
   }
 
   Future<void> _fetchRoomDetails() async {
@@ -175,10 +191,23 @@ class _HomeContentState extends State<_HomeContent> {
         });
       }
     } catch (e) {
-      debugPrint("Dashboard Room Fetch Error: $e");
+      debugPrint("Room Fetch Error: $e");
+      if (mounted) setState(() => _isLoadingRoom = false);
+    }
+  }
+
+  Future<void> _fetchHostelInfo() async {
+    try {
+      final response = await apiService.getMyHostelInfo();
       if (mounted) {
-        setState(() => _isLoadingRoom = false);
+        setState(() {
+          _hostelData = response;
+          _isLoadingHostel = false;
+        });
       }
+    } catch (e) {
+      debugPrint("Hostel Info Fetch Error: $e");
+      if (mounted) setState(() => _isLoadingHostel = false);
     }
   }
 
@@ -189,72 +218,76 @@ class _HomeContentState extends State<_HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 80,
-          floating: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [widget.primaryBlue, widget.secondaryBlue]
-              ),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
-          ),
-          title: const Text("SAHYOG PORTAL",
-              style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                  fontSize: 18,
-                  color: Colors.white)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: IconButton(
-                icon: const CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.white24,
-                  child: Icon(Icons.person_outline_rounded, color: Colors.white, size: 20),
+    return RefreshIndicator(
+      color: widget.primaryBlue,
+      onRefresh: _fetchDashboardData,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 80,
+            floating: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [widget.primaryBlue, widget.secondaryBlue]
                 ),
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => StudentProfile(userData: widget.userData))),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
               ),
             ),
-          ],
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              const SizedBox(height: 10),
-              _buildSectionHeader("Overview"),
-              _buildIdentityCard(widget.userData),
-              const SizedBox(height: 20),
-              _buildResidenceInfo(),
-              const SizedBox(height: 25),
-              _buildSectionHeader("Hostel Services"),
-              _buildBentoGrid(context, widget.userData),
-              const SizedBox(height: 25),
-              _buildSectionHeader("Primary Support"),
-              _buildWardenQuickLink(context, widget.userData, widget.primaryBlue),
-              const SizedBox(height: 100),
-            ]),
+            leading: IconButton(
+              icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NoticePage())),
+            ),
+            title: const Text("SAHYOG PORTAL",
+                style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontSize: 18,
+                    color: Colors.white)),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: IconButton(
+                  icon: const CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white24,
+                    child: Icon(Icons.person_outline_rounded, color: Colors.white, size: 20),
+                  ),
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => StudentProfile(userData: widget.userData))),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const SizedBox(height: 10),
+                FadeInDown(duration: const Duration(milliseconds: 500), child: _buildSectionHeader("Overview")),
+                FadeInDown(duration: const Duration(milliseconds: 600), child: _buildIdentityCard()),
+                const SizedBox(height: 20),
+                FadeInDown(duration: const Duration(milliseconds: 700), child: _buildResidenceInfo()),
+                const SizedBox(height: 25),
+                FadeInDown(duration: const Duration(milliseconds: 800), child: _buildSectionHeader("Hostel Services")),
+                _buildBentoGrid(context, widget.userData),
+                const SizedBox(height: 25),
+                FadeInDown(duration: const Duration(milliseconds: 900), child: _buildSectionHeader("Primary Support")),
+                _buildManagerList(),
+                const SizedBox(height: 100),
+              ]),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -267,7 +300,10 @@ class _HomeContentState extends State<_HomeContent> {
     );
   }
 
-  Widget _buildIdentityCard(Map<String, String> userData) {
+  Widget _buildIdentityCard() {
+    String name = _isLoadingHostel ? "..." : (_hostelData?.data?.studentName ?? widget.userData['name'] ?? "Student");
+    String hostelName = _isLoadingHostel ? "Fetching Hostel..." : (_hostelData?.data?.hostelName ?? "No Hostel Assigned");
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -295,19 +331,24 @@ class _HomeContentState extends State<_HomeContent> {
               child: Icon(Icons.school_rounded, color: Colors.white, size: 35)
             ),
             const SizedBox(width: 18),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Hi, ${userData['name'] ?? "Student"}",
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Text("VERIFIED STUDENT",
-                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Hi, $name",
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(hostelName,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: const Text("VERIFIED STUDENT",
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -359,25 +400,10 @@ class _HomeContentState extends State<_HomeContent> {
       children: [
         _bentoItem(context, "Leave", Icons.holiday_village_rounded, widget.primaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => LeaveHistoryPage(userId: userId)))),
-        
-        // --- MESS SECTION COMMENTED OUT AS REQUESTED ---
-        /*
-        _bentoItem(context, "Mess", Icons.restaurant_rounded, widget.secondaryBlue, 
-          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MessMenuPage()))),
-        */
-
         _bentoItem(context, "Payments", Icons.account_balance_wallet_rounded, widget.secondaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage()))),
-
-        // --- COMPLAINTS SECTION COMMENTED OUT AS REQUESTED ---
-        /*
-        _bentoItem(context, "Complaints", Icons.assignment_late_rounded, const Color(0xFF1A237E), 
-          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage()))),
-        */
-
         _bentoItem(context, "Support", Icons.support_agent_rounded, widget.primaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServiceDeskPage()))),
-        
         _bentoItem(context, "Notice", Icons.campaign_rounded, widget.secondaryBlue, 
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticePage()))),
       ],
@@ -409,24 +435,49 @@ class _HomeContentState extends State<_HomeContent> {
     );
   }
 
-  Widget _buildWardenQuickLink(BuildContext context, Map<String, String> userData, Color primaryBlue) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.grey.shade100)
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: primaryBlue.withOpacity(0.1), 
-          child: Icon(Icons.person_4_rounded, color: primaryBlue)
+  Widget _buildManagerList() {
+    if (_isLoadingHostel) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final managers = _hostelData?.data?.assignedManagers ?? [];
+
+    if (managers.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+        child: const Center(child: Text("No assigned managers found")),
+      );
+    }
+
+    return Column(
+      children: managers.map((manager) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white, 
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.grey.shade100)
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: widget.primaryBlue.withOpacity(0.1), 
+              child: Icon(Icons.person_4_rounded, color: widget.primaryBlue)
+            ),
+            title: Text("${manager.firstName} ${manager.lastName}", 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            subtitle: Text("Hostel Manager | ${manager.mobile}", 
+              style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WardenChatScreen(userData: widget.userData))),
+          ),
         ),
-        title: const Text("Mrs. Sunita Sharma", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        subtitle: Text("Block Warden | Available", style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WardenChatScreen(userData: userData))),
-      ),
+      )).toList(),
     );
   }
 }
@@ -474,7 +525,7 @@ class _LeavePageState extends State<LeavePage> {
           ? selectedDate.toIso8601String()
           : selectedRange!.end.toIso8601String();
 
-      final response = await apiService.applyLeave(
+      await apiService.applyLeave(
         userId: _getUserId(),
         leaveType: isSingleDay ? "Casual" : "Medical",
         startDate: startDate,

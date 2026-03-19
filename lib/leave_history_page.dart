@@ -18,7 +18,7 @@ class _LeaveHistoryPageState extends State<LeaveHistoryPage>
     with SingleTickerProviderStateMixin {
   
   // Custom Color Palette
-  final Color primaryColor = const Color(0xFF6366F1); // Indigo
+  final Color primaryColor = const Color.fromRGBO(190, 10, 109, 1); // Indigo
   final Color pendingColor = Colors.orangeAccent;
   final Color approvedColor = const Color(0xFF10B981); // Emerald Green
   final Color rejectedColor = const Color(0xFFEF4444); // Rose Red
