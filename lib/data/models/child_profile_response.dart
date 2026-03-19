@@ -31,10 +31,10 @@ class ChildData {
 
   factory ChildData.fromJson(Map<String, dynamic> json) {
     return ChildData(
-      fullName: json['full_name'] ?? '',
-      studentId: json['student_id'] ?? '',
-      email: json['email'] ?? '',
-      mobile: json['mobile'] ?? '',
+      fullName: json['full_name'] ?? 'N/A',
+      studentId: json['student_id'] ?? 'N/A',
+      email: json['email'] ?? 'N/A',
+      mobile: json['mobile'] ?? 'N/A',
       academicDetails: json['academic_details'] != null 
           ? AcademicDetails.fromJson(json['academic_details']) 
           : null,
@@ -59,6 +59,17 @@ class AcademicDetails {
       admissionDate: json['admission_date'],
     );
   }
+
+  /// Helper to convert the API's ISO date string into a readable format (DD/MM/YYYY)
+  String get formattedDate {
+    if (admissionDate == null) return "N/A";
+    try {
+      DateTime dt = DateTime.parse(admissionDate!);
+      return "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
+    } catch (e) {
+      return "N/A";
+    }
+  }
 }
 
 class HostelInfo {
@@ -70,7 +81,13 @@ class HostelInfo {
   factory HostelInfo.fromJson(Map<String, dynamic> json) {
     return HostelInfo(
       hostelId: json['hostel_id'] ?? 0,
-      status: json['status'] ?? '',
+      status: json['status'] ?? 'Inactive',
     );
+  }
+
+  /// Helper to get a capitalized status for UI display
+  String get displayStatus {
+    if (status.isEmpty) return "Unknown";
+    return status[0].toUpperCase() + status.substring(1).toLowerCase();
   }
 }

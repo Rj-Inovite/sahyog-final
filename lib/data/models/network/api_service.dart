@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/data/models/child_profile_response.dart';
 
 // --- MODELS ---
 import 'package:my_app/data/models/my_hostel_info_response.dart';
@@ -9,6 +10,7 @@ import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/network/my_room_response.dart'; 
+ // Verified Import
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -54,7 +56,6 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 30),
     ));
 
-    // Add Interceptors
     _dio.interceptors.add(AuthInterceptor());
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
@@ -63,7 +64,6 @@ class ApiService {
       error: true,
     ));
 
-    // Initialize Retrofit client with the configured Dio instance
     client = RestAPIClient(_dio);
   }
 
@@ -99,9 +99,7 @@ class ApiService {
 
   Future<WardenListResponse?> getWardenList() async {
     try {
-      // UPDATED: Path matches your Laravel route: Route::get('/warden/profile'...)
       final response = await _dio.get("warden/profile"); 
-      
       if (response.statusCode == 200 && response.data != null) {
         return WardenListResponse.fromJson(response.data);
       }
@@ -112,12 +110,35 @@ class ApiService {
     }
   }
 
-  // Private helper for cleaner error logging
+  // ================= PARENT APIS (Elaborated) =================
+
+  /// Fetches child profile details for the logged-in parent
+  Future<ChildProfileResponse?> getChildProfile() async {
+    try {
+      final response = await _dio.get("parent/child-profile");
+      if (response.statusCode == 200 && response.data != null) {
+        // Correctly mapping the JSON data to our model
+        return ChildProfileResponse.fromJson(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      _handleDioError("Child Profile", e);
+      return null;
+    } catch (e) {
+      debugPrint("Unexpected Error in getChildProfile: $e");
+      return null;
+    }
+  }
+
+  // ================= UTILITIES & SHARED =================
+
   void _handleDioError(String apiName, DioException e) {
     if (e.response?.statusCode == 404) {
       debugPrint("Sahyog API 404: $apiName endpoint not found at ${e.requestOptions.path}");
+    } else if (e.response?.statusCode == 401) {
+      debugPrint("Sahyog API 401: Unauthorized access to $apiName");
     } else {
-      debugPrint("Dio Error ($apiName): ${e.message}");
+      debugPrint("Dio Error ($apiName): ${e.message} | Code: ${e.response?.statusCode}");
     }
   }
 
@@ -135,8 +156,6 @@ class ApiService {
       return null;
     }
   }
-
-  // ================= STUDENT PROFILE VIEW =================
 
   Future<dynamic> getStudentProfileView(int studentId) async {
     try {
