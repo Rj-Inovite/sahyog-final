@@ -7,17 +7,18 @@ import 'dart:ui';
 import 'register.dart'; 
 import 'warden-response.dart'; 
 import 'warden_profile.dart'; 
+import 'warden_std_leave_approve.dart'; // <--- NEW IMPORT
 import 'data/models/network/api_service.dart'; 
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/warden_list_response.dart';
 
-// --- DESIGN SYSTEM (Sahyog Professional Palette) ---
-const Color sunsetOrange = Color(0xFFFF8C42);
-const Color warmYellow = Color.fromRGBO(189, 95, 7, 1);
-const Color backgroundWhite = Color(0xFFF8F9FA);
+// --- DESIGN SYSTEM (Indigo Professional Palette) ---
+const Color primaryIndigo = Color(0xFF3F51B5); 
+const Color darkIndigo = Color(0xFF303F9F);    
+const Color backgroundWhite = Color(0xFFFFFFFF); 
 const Color textDark = Color(0xFF2D3436);
 const Color successGreen = Color(0xFF00B894);
-const Color cardShadow = Color(0x0A000000);
+const Color cardShadow = Color(0x0F000000); 
 
 class WardenDashboard extends StatefulWidget {
   final Map<String, String> userData;
@@ -34,7 +35,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
   @override
   void initState() {
     super.initState();
-    // Initialize pages and pass the logged-in userData to the Home Console
     _pages = [
       ConsoleHome(userData: widget.userData),
       const StudentDirectoryPage(), 
@@ -50,7 +50,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
       appBar: AppBar(
         title: const Text("Sahyog Manager",
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 1.2)),
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         centerTitle: false,
         elevation: 0,
         leading: _currentIndex != 0 ? IconButton(
@@ -65,7 +65,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
               child: IconButton(
                 icon: const Icon(Icons.person_outline_rounded, color: Colors.white),
                 onPressed: () {
-                  // Integration: Opens the Warden Profile from the shared API structure
                   Navigator.push(
                     context, 
                     MaterialPageRoute(
@@ -85,7 +84,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: sunsetOrange,
+          selectedItemColor: primaryIndigo,
           unselectedItemColor: Colors.blueGrey.withOpacity(0.4),
           currentIndex: _currentIndex,
           backgroundColor: Colors.white,
@@ -97,7 +96,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
             BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), activeIcon: Icon(Icons.grid_view_sharp), label: "Home"),
             BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups_rounded), label: "Students"),
             BottomNavigationBarItem(icon: Icon(Icons.alternate_email_rounded), activeIcon: Icon(Icons.mail_rounded), label: "Inbox"),
-           
           ],
         ),
       ),
@@ -105,7 +103,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
   }
 }
 
-// --- SECTION 1: CONSOLE HOME (NOW INTEGRATES PROFILE API) ---
 class ConsoleHome extends StatefulWidget {
   final Map<String, String> userData;
   const ConsoleHome({super.key, required this.userData});
@@ -127,10 +124,9 @@ class _ConsoleHomeState extends State<ConsoleHome> {
 
   Future<void> _fetchWardenProfileData() async {
     try {
-      final response = await apiService.getWardenList(); // Using this to get the logged_in_warden key
+      final response = await apiService.getWardenList();
       if (response != null && response.success == true) {
         setState(() {
-          // Mapping from your specific response structure
           _wardenName = response.loggedInWarden; 
           _hostelName = response.hostelName;
           _isProfileLoading = false;
@@ -146,7 +142,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _fetchWardenProfileData,
-      color: sunsetOrange,
+      color: primaryIndigo,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         child: Column(
@@ -176,7 +172,6 @@ class _ConsoleHomeState extends State<ConsoleHome> {
   }
 
   Widget _buildHeroHeader() {
-    // Dynamic fallback to userData if API hasn't loaded yet
     String displayName = _wardenName ?? widget.userData['name'] ?? 'Warden';
     String subtitle = _hostelName ?? "Sahyog Management";
 
@@ -187,7 +182,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [sunsetOrange, warmYellow],
+          colors: [primaryIndigo, darkIndigo],
         ),
         borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
       ),
@@ -196,8 +191,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          Text(displayName, 
-            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
           Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
@@ -221,11 +215,11 @@ class _ConsoleHomeState extends State<ConsoleHome> {
   Widget _buildQuickStats(BuildContext context) {
     return Row(
       children: [
-        _statItem(context, "Occupancy", "94%", Icons.bed_rounded, Colors.blue, const OccupancyStatsPage()),
+        _statItem(context, "Occupancy", "94%", Icons.bed_rounded, primaryIndigo, const OccupancyStatsPage()),
         const SizedBox(width: 12),
-        _statItem(context, "Tickets", "03", Icons.assignment_late_rounded, Colors.red, const ComplaintManagementPage()),
+        _statItem(context, "Tickets", "03", Icons.assignment_late_rounded, Colors.redAccent, const ComplaintManagementPage()),
         const SizedBox(width: 12),
-        _statItem(context, "Active Staff", "08", Icons.badge_rounded, Colors.green, const StaffManagementPage()),
+        _statItem(context, "Active Staff", "08", Icons.badge_rounded, Colors.teal, const StaffManagementPage()),
       ],
     );
   }
@@ -240,6 +234,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(25),
             boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 10, offset: Offset(0, 4))],
+            border: Border.all(color: Colors.grey.shade50),
           ),
           child: Column(
             children: [
@@ -265,6 +260,9 @@ class _ConsoleHomeState extends State<ConsoleHome> {
       children: [
         _moduleCard(context, "Room Allotment", Icons.grid_view_rounded, const RoomInventoryPage(), "Manage Allotments"),
         _moduleCard(context, "Std attendance", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
+        // --- NEW MODULE ADDED ---
+        _moduleCard(context, "Leave Records", Icons.time_to_leave_rounded, const WardenStdLeaveApprovePage(), "Approve Requests"),
+        // ------------------------
         _moduleCard(context, "Staff", Icons.supervised_user_circle_rounded, const StaffManagementPage(), "Warden Directory"),
         _moduleCard(context, "Security Logs", Icons.security_rounded, const GateRecordsPage(), "Entry/Exit Log"),
       ],
@@ -279,13 +277,14 @@ class _ConsoleHomeState extends State<ConsoleHome> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: primaryIndigo.withOpacity(0.05)),
+          boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 5, offset: Offset(0, 2))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: sunsetOrange, size: 32),
+            Icon(icon, color: primaryIndigo, size: 32),
             const SizedBox(height: 12),
             Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: textDark)),
             Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500)),
@@ -296,7 +295,6 @@ class _ConsoleHomeState extends State<ConsoleHome> {
   }
 }
 
-// --- SECTION 2: STUDENT DIRECTORY (API INTEGRATED) ---
 class StudentDirectoryPage extends StatefulWidget {
   const StudentDirectoryPage({super.key});
 
@@ -347,10 +345,10 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
     return Scaffold(
       backgroundColor: backgroundWhite,
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: sunsetOrange))
+        ? const Center(child: CircularProgressIndicator(color: primaryIndigo))
         : RefreshIndicator(
             onRefresh: _fetchStudents,
-            color: sunsetOrange,
+            color: primaryIndigo,
             child: _students.isEmpty 
               ? const Center(child: Text("No Students Found", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))
               : ListView.builder(
@@ -376,12 +374,12 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
         leading: Container(
           width: 55, height: 55,
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [sunsetOrange.withOpacity(0.2), sunsetOrange.withOpacity(0.05)]),
+            gradient: LinearGradient(colors: [primaryIndigo.withOpacity(0.1), primaryIndigo.withOpacity(0.05)]),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Center(
             child: Text(student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : "?", 
-                style: const TextStyle(color: sunsetOrange, fontWeight: FontWeight.w900, fontSize: 20)),
+                style: const TextStyle(color: primaryIndigo, fontWeight: FontWeight.w900, fontSize: 20)),
           ),
         ),
         title: Text("${student.firstName} ${student.lastName ?? ''}", 
@@ -401,7 +399,6 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
   }
 }
 
-// --- SECTION 7: STAFF MANAGEMENT (WARDEN API INTEGRATED) ---
 class StaffManagementPage extends StatefulWidget {
   const StaffManagementPage({super.key});
   @override
@@ -445,7 +442,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Staff Directory", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -453,10 +450,10 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
         ),
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: sunsetOrange)) 
+        ? const Center(child: CircularProgressIndicator(color: primaryIndigo)) 
         : RefreshIndicator(
             onRefresh: _fetchWardens,
-            color: sunsetOrange,
+            color: primaryIndigo,
             child: _wardens.isEmpty
               ? const Center(child: Text("No Staff Members Found"))
               : ListView.builder(
@@ -477,13 +474,13 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
       decoration: BoxDecoration(
         color: Colors.white, 
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isMe ? sunsetOrange.withOpacity(0.5) : Colors.transparent, width: 1.5),
+        border: Border.all(color: isMe ? primaryIndigo.withOpacity(0.3) : Colors.transparent, width: 1.5),
         boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isMe ? sunsetOrange : sunsetOrange.withOpacity(0.1), 
-          child: Icon(Icons.verified_user_rounded, color: isMe ? Colors.white : sunsetOrange, size: 20)
+          backgroundColor: isMe ? primaryIndigo : primaryIndigo.withOpacity(0.1), 
+          child: Icon(Icons.verified_user_rounded, color: isMe ? Colors.white : primaryIndigo, size: 20)
         ),
         title: Row(
           children: [
@@ -492,23 +489,20 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: sunsetOrange.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
-                child: const Text("YOU", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: sunsetOrange)),
+                decoration: BoxDecoration(color: primaryIndigo.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
+                child: const Text("YOU", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: primaryIndigo)),
               )
             ]
           ],
         ),
         subtitle: Text("${warden.email ?? ''} | ${warden.mobile ?? ''}", style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-        onTap: () {
-          // Future expansion: Detailed Warden View
-        },
+        onTap: () {},
       ),
     );
   }
 }
 
-// --- SECTION 3: COMPLAINT MANAGEMENT ---
 class ComplaintManagementPage extends StatelessWidget {
   const ComplaintManagementPage({super.key});
 
@@ -518,7 +512,7 @@ class ComplaintManagementPage extends StatelessWidget {
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Maintenance Tickets"), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -535,6 +529,7 @@ class ComplaintManagementPage extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(25),
             border: Border.all(color: Colors.grey.shade100),
+            boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 5, offset: Offset(0, 2))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,13 +549,17 @@ class ComplaintManagementPage extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: sunsetOrange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryIndigo, 
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0
+                      ),
                       onPressed: () {},
                       child: const Text("Assign Technician", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  IconButton(onPressed: (){}, icon: const Icon(Icons.chat_bubble_outline_rounded, color: sunsetOrange)),
+                  IconButton(onPressed: (){}, icon: const Icon(Icons.chat_bubble_outline_rounded, color: primaryIndigo)),
                 ],
               )
             ],
@@ -571,7 +570,6 @@ class ComplaintManagementPage extends StatelessWidget {
   }
 }
 
-// --- SECTION 4: ROOM INVENTORY ---
 class RoomInventoryPage extends StatelessWidget {
   const RoomInventoryPage({super.key});
 
@@ -581,7 +579,7 @@ class RoomInventoryPage extends StatelessWidget {
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Hostel Bed Layout"), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -598,16 +596,16 @@ class RoomInventoryPage extends StatelessWidget {
           bool isOccupied = i % 3 != 0;
           return Container(
             decoration: BoxDecoration(
-              color: isOccupied ? sunsetOrange.withOpacity(0.05) : successGreen.withOpacity(0.05),
+              color: isOccupied ? primaryIndigo.withOpacity(0.05) : successGreen.withOpacity(0.05),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: isOccupied ? sunsetOrange.withOpacity(0.2) : successGreen.withOpacity(0.2)),
+              border: Border.all(color: isOccupied ? primaryIndigo.withOpacity(0.2) : successGreen.withOpacity(0.2)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text("${101 + i}", style: TextStyle(fontWeight: FontWeight.w900, color: isOccupied ? sunsetOrange : successGreen)),
+                Text("${101 + i}", style: TextStyle(fontWeight: FontWeight.w900, color: isOccupied ? primaryIndigo : successGreen)),
                 const SizedBox(height: 4),
-                Icon(isOccupied ? Icons.person_rounded : Icons.check_circle_outline_rounded, size: 14, color: isOccupied ? sunsetOrange : successGreen),
+                Icon(isOccupied ? Icons.person_rounded : Icons.check_circle_outline_rounded, size: 14, color: isOccupied ? primaryIndigo : successGreen),
               ],
             ),
           );
@@ -617,7 +615,6 @@ class RoomInventoryPage extends StatelessWidget {
   }
 }
 
-// --- SECTION 5: ATTENDANCE ---
 class AttendancePage extends StatelessWidget {
   const AttendancePage({super.key});
 
@@ -627,7 +624,7 @@ class AttendancePage extends StatelessWidget {
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Daily Attendance"), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -639,14 +636,14 @@ class AttendancePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(25),
             decoration: BoxDecoration(
-              color: sunsetOrange.withOpacity(0.05),
+              color: primaryIndigo.withOpacity(0.05),
               borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Batch", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("March 19, 2026", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Status", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("78% Present", style: TextStyle(color: sunsetOrange, fontWeight: FontWeight.bold, fontSize: 16))]),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Status", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("78% Present", style: TextStyle(color: primaryIndigo, fontWeight: FontWeight.bold, fontSize: 16))]),
               ],
             ),
           ),
@@ -656,9 +653,13 @@ class AttendancePage extends StatelessWidget {
               itemCount: 10,
               itemBuilder: (ctx, i) => Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+                decoration: BoxDecoration(
+                  color: Colors.white, 
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 4, offset: Offset(0, 2))],
+                ),
                 child: ListTile(
-                  leading: CircleAvatar(backgroundColor: Colors.blueGrey.shade50, child: Icon(Icons.person_rounded, color: Colors.blueGrey.shade200)),
+                  leading: CircleAvatar(backgroundColor: Colors.blueGrey.shade50, child: Icon(Icons.person_rounded, color: primaryIndigo.withOpacity(0.3))),
                   title: Text("Student #$i", style: const TextStyle(fontWeight: FontWeight.bold)),
                   trailing: Switch(value: true, activeColor: successGreen, onChanged: (v){}),
                 ),
@@ -670,7 +671,7 @@ class AttendancePage extends StatelessWidget {
             child: SizedBox(
               width: double.infinity, height: 60,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: sunsetOrange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+                style: ElevatedButton.styleFrom(backgroundColor: primaryIndigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
                 onPressed: () {},
                 child: const Text("SUBMIT ATTENDANCE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
               ),
@@ -682,16 +683,16 @@ class AttendancePage extends StatelessWidget {
   }
 }
 
-// --- SECTION 6: GATE RECORDS ---
 class GateRecordsPage extends StatelessWidget {
   const GateRecordsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Campus Access Log"), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -709,7 +710,7 @@ class GateRecordsPage extends StatelessWidget {
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade100)),
             child: Row(
               children: [
-                Icon(isEntry ? Icons.login_rounded : Icons.logout_rounded, color: isEntry ? successGreen : sunsetOrange),
+                Icon(isEntry ? Icons.login_rounded : Icons.logout_rounded, color: isEntry ? successGreen : primaryIndigo),
                 const SizedBox(width: 15),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Student #102$i", style: const TextStyle(fontWeight: FontWeight.bold)), Text(isEntry ? "Hostel Entry" : "Gate Exit", style: const TextStyle(color: Colors.grey, fontSize: 12))])),
                 const Text("08:45 PM", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -722,7 +723,6 @@ class GateRecordsPage extends StatelessWidget {
   }
 }
 
-// --- SECTION 8: OCCUPANCY STATS ---
 class OccupancyStatsPage extends StatelessWidget {
   const OccupancyStatsPage({super.key});
 
@@ -732,7 +732,7 @@ class OccupancyStatsPage extends StatelessWidget {
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         title: const Text("Hostel Utilization"), 
-        backgroundColor: sunsetOrange,
+        backgroundColor: primaryIndigo,
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -748,7 +748,7 @@ class OccupancyStatsPage extends StatelessWidget {
             Stack(
               alignment: Alignment.center,
               children: [
-                const SizedBox(width: 220, height: 220, child: CircularProgressIndicator(value: 0.94, strokeWidth: 15, color: sunsetOrange, backgroundColor: Color(0xFFEEEEEE))),
+                const SizedBox(width: 220, height: 220, child: CircularProgressIndicator(value: 0.94, strokeWidth: 15, color: primaryIndigo, backgroundColor: Color(0xFFEEEEEE))),
                 const Column(mainAxisSize: MainAxisSize.min, children: [Text("94%", style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900)), Text("Occupied", style: TextStyle(color: Colors.grey))]),
               ],
             ),
@@ -767,13 +767,12 @@ class OccupancyStatsPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text(label, style: const TextStyle(fontWeight: FontWeight.bold)), Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: sunsetOrange, fontSize: 18))],
+        children: [Text(label, style: const TextStyle(fontWeight: FontWeight.bold)), Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: primaryIndigo, fontSize: 18))],
       ),
     );
   }
 }
 
-// --- ANIMATED SHINY REGISTRY BUTTON ---
 class ShinyRegistryButton extends StatefulWidget {
   const ShinyRegistryButton({super.key});
   @override
@@ -799,16 +798,16 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
-              colors: const [warmYellow, Colors.white, warmYellow],
+              colors: const [primaryIndigo, Colors.white, primaryIndigo],
               stops: [_controller.value - 0.2, _controller.value, _controller.value + 0.2],
             ),
-            boxShadow: [BoxShadow(color: warmYellow.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+            boxShadow: [BoxShadow(color: primaryIndigo.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
           ),
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterStudent())),
-            icon: const Icon(Icons.person_add_rounded, color: textDark, size: 28),
-            label: const Text("NEW STUDENT REGISTRATION", style: TextStyle(color: textDark, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+            icon: const Icon(Icons.person_add_rounded, color: Color.fromRGBO(249, 252, 253, 1), size: 28),
+            label: const Text("NEW STUDENT REGISTRATION", style: TextStyle(color: Color.fromRGBO(248, 254, 255, 1), fontWeight: FontWeight.w900, letterSpacing: 1.0)),
           ),
         );
       },
@@ -816,7 +815,6 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
   }
 }
 
-// --- ADDITIONAL PAGES ---
 class WardenInboxPage extends StatelessWidget {
   const WardenInboxPage({super.key});
   @override
@@ -826,5 +824,5 @@ class WardenInboxPage extends StatelessWidget {
 class AdminSetupPage extends StatelessWidget {
   const AdminSetupPage({super.key});
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [const ListTile(leading: Icon(Icons.sync_lock_rounded), title: Text("Force System Sync")), const Divider(), ListTile(leading: const Icon(Icons.logout_rounded, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false))]);
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [const ListTile(leading: Icon(Icons.sync_lock_rounded, color: primaryIndigo), title: Text("Force System Sync")), const Divider(), ListTile(leading: const Icon(Icons.logout_rounded, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false))]);
 }

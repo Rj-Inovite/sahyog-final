@@ -3,7 +3,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 // --- STORAGE ---
-import 'auth_local_storage.dart';
+// Ensure this path matches your project structure
+
+import 'package:my_app/data/models/network/auth_local_storage.dart'; 
 
 /// This Interceptor automatically adds the Bearer Token to every outgoing request.
 /// It ensures the Web Panel and App stay synced by identifying the user via Token.
@@ -14,21 +16,24 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // 1. Retrieve the token from Local Storage
-    // Dio waits for this 'await' before moving to the next step.
-    final String? token = await AuthLocalStorage.getToken();
+    try {
+      // 1. Retrieve the token from Local Storage
+      final String? token = await AuthLocalStorage.getToken();
 
-    // 2. Standardize Headers for Laravel/PHP Backends
-    // This ensures the server always communicates via JSON, even on errors.
-    options.headers['Accept'] = 'application/json';
-    options.headers['Content-Type'] = 'application/json';
+      // 2. Standardize Headers for Laravel/PHP Backends
+      // These are vital for your 'guardian/leave/approve' and 'warden' POST requests.
+      options.headers['Accept'] = 'application/json';
+      options.headers['Content-Type'] = 'application/json';
 
-    // 3. Inject Bearer Token if available
-    if (token != null && token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
-      // debugPrint("--- AUTH: Token Injected for ${options.path} ---");
-    } else {
-      debugPrint("--- AUTH: No Token Found for ${options.path} ---");
+      // 3. Inject Bearer Token if available
+      if (token != null && token.isNotEmpty) {
+        // Ensuring the format is exactly "Bearer <token>"
+        options.headers['Authorization'] = 'Bearer $token';
+      } else {
+        debugPrint("--- AUTH: No Token Found for ${options.path} ---");
+      }
+    } catch (e) {
+      debugPrint("--- AUTH_INTERCEPTOR_ERROR: $e ---");
     }
 
     // 4. Continue with the request
@@ -37,7 +42,7 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    // Log successful status codes for debugging high-frequency syncs
+    // Standard successful logging for debugging API flows
     if (response.statusCode == 200 || response.statusCode == 201) {
       debugPrint("--- API SUCCESS: [${response.requestOptions.path}] ---");
     }
@@ -47,29 +52,34 @@ class AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // 5. Handle Token Expiry or Invalid Session (401 Unauthorized)
+    // If the token is rejected by the Sahyog server, we must clear local data.
     if (err.response?.statusCode == 401) {
-      debugPrint("--- AUTH ERROR: 401 Unauthorized. Clearing Session... ---");
+      debugPrint("--- AUTH ERROR: 401 Unauthorized for ${err.requestOptions.path} ---");
       
-      // Clear local storage so the app doesn't try to use the bad token again
+      // Clear local storage so the app doesn't attempt to use an invalid session
       AuthLocalStorage.clearAuthData();
       
-      // PRO TIP: You can use a global stream or event bus here to 
-      // trigger the UI to pop back to the Login Screen.
+      // NOTE: If you have a GlobalKey for Navigation, 
+      // you can trigger a push to LoginPage here.
     }
 
-    // 6. Specific Logging for the 404 Errors you are seeing
+    // 6. Specific Logging for Route Errors (404)
     if (err.response?.statusCode == 404) {
       debugPrint("--- ROUTE ERROR: 404 Not Found at ${err.requestOptions.path} ---");
-      debugPrint("Check if 'manager/warden-list' is correctly defined in api.php");
     }
 
-    // 7. Handle Connection Issues
+    // 7. Handle Connection Issues (Timeouts)
     if (err.type == DioExceptionType.connectionTimeout || 
         err.type == DioExceptionType.receiveTimeout) {
-      debugPrint("--- NETWORK ERROR: Timeout. Sahyog Server might be down or slow. ---");
+      debugPrint("--- NETWORK ERROR: Timeout on ${err.requestOptions.path}. Check Sahyog Server status. ---");
     }
 
-    // Continue passing the error so the ApiService can handle the UI state
+    // 8. Handle Specific Backend Errors (500)
+    if (err.response?.statusCode == 500) {
+      debugPrint("--- SERVER ERROR: 500 Internal Server Error at ${err.requestOptions.path} ---");
+    }
+
+    // Return the error to the calling Service so it can show a SnackBar or Error UI
     return handler.next(err);
   }
 }

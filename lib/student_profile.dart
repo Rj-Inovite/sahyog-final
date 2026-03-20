@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animate_do/animate_do.dart';
 
-// ✅ RESTORED: USING YOUR CENTRAL API SERVICE & MODELS
+// ✅ USING YOUR CENTRAL API SERVICE & MODELS
 import '../data/models/network/api_service.dart'; 
 import '../data/models/network/password_update_model.dart';
 
@@ -26,12 +26,13 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
   final Color lightLavender = const Color(0xFFF3E5F5);
   final Color bgWhite = Colors.white;
   final Color cardGrey = const Color(0xFFF8F9FA);
-  final Color softGrey = const Color(0xFFEEEEEE); // ✅ DEFINED: Error Fixed
+  final Color softGrey = const Color(0xFFEEEEEE); 
 
   // Controllers for editable fields
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _addressController;
+  late TextEditingController _phoneController; // ✅ ADDED: For API mobile field
   
   // ✅ API Data Holders
   String _status = "ACTIVE";
@@ -47,19 +48,24 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
   void initState() {
     super.initState();
     
-    // ✅ LOGIC: USE GMAIL PREFIX AS NAME IF FIRST_NAME IS NULL
+    // ✅ SYNC LOGIC: Handle naming and mobile from initial userData
     String email = widget.userData['email'] ?? "student@gmail.com";
-    String gmailPrefix = email.split('@')[0].toUpperCase();
-    String initialName = widget.userData['first_name'] ?? gmailPrefix;
+    String firstName = widget.userData['first_name'] ?? "";
+    String lastName = widget.userData['last_name'] ?? "";
+    String initialName = "$firstName $lastName".trim();
+
+    // Fallback if name is empty
+    if (initialName.isEmpty) {
+      initialName = email.split('@')[0].toUpperCase();
+    }
 
     _nameController = TextEditingController(text: initialName);
     _emailController = TextEditingController(text: email);
     _addressController = TextEditingController(text: widget.userData['address'] ?? "Address not set");
+    _phoneController = TextEditingController(text: widget.userData['mobile']?.toString() ?? "");
     
-    // 2 Tabs: Identity and Security
     _tabController = TabController(length: 2, vsync: this);
 
-    // Initializations
     _loadSavedImage();
     _fetchWebProfileData();
   }
@@ -69,19 +75,9 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     _nameController.dispose();
     _emailController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
     _tabController.dispose();
     super.dispose();
-  }
-
-  // --- PERSISTENCE: LOAD IMAGE FROM LOCAL STORAGE ---
-  Future<void> _loadSavedImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? imagePath = prefs.getString('saved_profile_path');
-    if (imagePath != null && File(imagePath).existsSync()) {
-      setState(() {
-        _profileImage = File(imagePath);
-      });
-    }
   }
 
   // --- API LOGIC: FETCH FROM WEB DASHBOARD ---
@@ -89,18 +85,18 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     setState(() => _isLoading = true);
     try {
       final int studentId = int.parse(widget.userData['id'].toString());
-      
-      // Hit the endpoint: GET student/view/{id}
       final response = await apiService.getStudentProfileView(studentId);
 
-      if (response != null && response['success'] == true) {
+      if (response != null && response['status'] == 'success') {
         final data = response['data'];
         setState(() {
           _status = (data['status'] ?? "ACTIVE").toString().toUpperCase();
           _rollNo = data['user_id']?.toString() ?? "N/A";
+          _addressController.text = data['address'] ?? _addressController.text;
+          _phoneController.text = data['mobile']?.toString() ?? _phoneController.text;
           
-          if (data['permanent_address'] != null) {
-            _addressController.text = data['permanent_address'];
+          if (data['first_name'] != null) {
+            _nameController.text = "${data['first_name']} ${data['last_name'] ?? ""}".trim();
           }
         });
       }
@@ -111,18 +107,37 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     }
   }
 
-  // --- IMAGE PICKER & PERMANENT SAVING ---
-  Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (image != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_profile_path', image.path); 
-      setState(() => _profileImage = File(image.path));
-      _showSnackBar("Profile image updated!", Colors.deepPurple);
+  // --- ✅ NEW API LOGIC: UPDATE PROFILE (PUT /user/update) ---
+  Future<void> _updateProfileOnServer() async {
+    setState(() => _isLoading = true);
+    try {
+      // Split name into first and last as required by Laravel
+      List<String> nameParts = _nameController.text.trim().split(' ');
+      String fName = nameParts.isNotEmpty ? nameParts[0] : "";
+      String lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : "";
+
+      final Map<String, dynamic> body = {
+        "first_name": fName,
+        "last_name": lName,
+        "mobile": _phoneController.text,
+        "address": _addressController.text,
+      };
+
+      final response = await apiService.client.updateProfile(body);
+
+      if (response['status'] == 'success') {
+        setState(() => _isEditing = false);
+        _showSnackBar(response['message'] ?? "Profile Updated!", Colors.green);
+      }
+    } catch (e) {
+      debugPrint("Update Error: $e");
+      _showSnackBar("Update failed. Check your connection.", Colors.red);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- RESTORED: PASSWORD UPDATE LOGIC ---
+  // --- PASSWORD UPDATE LOGIC ---
   Future<void> _handlePasswordUpdate(String oldP, String newP, String confirmP) async {
     if (newP.isEmpty || oldP.isEmpty) {
       _showSnackBar("Please fill all password fields", Colors.orange);
@@ -149,9 +164,28 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
         _showSnackBar("Password updated successfully!", Colors.green);
       }
     } catch (e) {
-      _showSnackBar("Failed to update password. Check current one.", Colors.red);
+      _showSnackBar("Failed to update password.", Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- IMAGE HELPERS ---
+  Future<void> _loadSavedImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? imagePath = prefs.getString('saved_profile_path');
+    if (imagePath != null && File(imagePath).existsSync()) {
+      setState(() => _profileImage = File(imagePath));
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (image != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_profile_path', image.path); 
+      setState(() => _profileImage = File(image.path));
+      _showSnackBar("Profile image updated!", Colors.deepPurple);
     }
   }
 
@@ -195,7 +229,6 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return SliverAppBar(
       expandedHeight: 280,
       pinned: true,
-      stretch: true,
       backgroundColor: primaryPurple,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
@@ -204,11 +237,7 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [primaryPurple, accentPurple, deepPurple],
-            ),
+            gradient: LinearGradient(colors: [primaryPurple, accentPurple, deepPurple]),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -218,10 +247,9 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
               const SizedBox(height: 15),
               FadeInDown(
                 child: Text(_nameController.text, 
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
               ),
-              Text(_emailController.text, 
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(_emailController.text, style: TextStyle(color: Colors.white.withOpacity(0.8))),
             ],
           ),
         ),
@@ -230,8 +258,11 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
         IconButton(
           icon: Icon(_isEditing ? Icons.check_circle_rounded : Icons.edit_note_rounded, color: Colors.white, size: 30),
           onPressed: () {
-            setState(() => _isEditing = !_isEditing);
-            if (!_isEditing) _showSnackBar("Profile View Updated!", Colors.green);
+            if (_isEditing) {
+              _updateProfileOnServer(); // ✅ CALLS API ON SAVE
+            } else {
+              setState(() => _isEditing = true);
+            }
           },
         )
       ],
@@ -242,35 +273,22 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ZoomIn(
       child: Stack(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+          CircleAvatar(
+            radius: 60,
+            backgroundColor: Colors.white24,
             child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.white,
-              child: CircleAvatar(
-                radius: 56,
-                backgroundColor: lightLavender,
-                backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                child: _profileImage == null 
-                    ? Icon(Icons.person_rounded, size: 60, color: primaryPurple) 
-                    : null,
-              ),
+              radius: 56,
+              backgroundColor: lightLavender,
+              backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+              child: _profileImage == null ? Icon(Icons.person_rounded, size: 60, color: primaryPurple) : null,
             ),
           ),
           Positioned(
-            bottom: 5,
-            right: 5,
+            bottom: 5, right: 5, 
             child: GestureDetector(
               onTap: _pickImage,
-              child: BounceInDown(
-                child: CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 18,
-                  child: Icon(Icons.add_a_photo_rounded, size: 18, color: primaryPurple),
-                ),
-              ),
-            ),
+              child: CircleAvatar(backgroundColor: Colors.white, radius: 18, child: Icon(Icons.camera_alt, size: 18, color: primaryPurple))
+            )
           ),
         ],
       ),
@@ -282,22 +300,12 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       child: Container(
         color: deepPurple,
         child: Container(
-          decoration: BoxDecoration(
-            color: bgWhite,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
-          ),
+          decoration: BoxDecoration(color: bgWhite, borderRadius: const BorderRadius.vertical(top: Radius.circular(35))),
           child: TabBar(
             controller: _tabController,
             labelColor: primaryPurple,
-            unselectedLabelColor: Colors.grey[400],
-            indicator: UnderlineTabIndicator(
-              borderSide: BorderSide(width: 4, color: primaryPurple),
-              insets: const EdgeInsets.symmetric(horizontal: 40),
-            ),
-            tabs: const [
-              Tab(icon: Icon(Icons.badge_rounded), text: "Identity"),
-              Tab(icon: Icon(Icons.verified_user_rounded), text: "Security"),
-            ],
+            indicatorColor: primaryPurple,
+            tabs: const [Tab(text: "Identity"), Tab(text: "Security")],
           ),
         ),
       ),
@@ -320,24 +328,18 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        FadeInLeft(child: _buildTextField("Student Name", _nameController, Icons.person_outline, isReadOnly: !_isEditing)),
-        FadeInLeft(delay: const Duration(milliseconds: 100), child: _buildTextField("Official Email", _emailController, Icons.alternate_email_rounded, isReadOnly: true)),
-        FadeInLeft(delay: const Duration(milliseconds: 200), child: _buildTextField("Current Address", _addressController, Icons.home_outlined, isReadOnly: !_isEditing, isLong: true)),
-        const SizedBox(height: 20),
-        FadeInUp(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: softGrey, borderRadius: BorderRadius.circular(15)),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: primaryPurple, size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text("Email is managed by admin and cannot be changed.", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                )
-              ],
-            ),
-          ),
+        FadeInLeft(child: _buildTextField("Full Name", _nameController, Icons.person_outline, isReadOnly: !_isEditing)),
+        FadeInLeft(delay: const Duration(milliseconds: 100), child: _buildTextField("Phone Number", _phoneController, Icons.phone_android_rounded, isReadOnly: !_isEditing)),
+        FadeInLeft(delay: const Duration(milliseconds: 200), child: _buildTextField("Official Email", _emailController, Icons.alternate_email_rounded, isReadOnly: true)),
+        FadeInLeft(delay: const Duration(milliseconds: 300), child: _buildTextField("Home Address", _addressController, Icons.home_outlined, isReadOnly: !_isEditing, isLong: true)),
+        
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildBadge("Status", _status, Colors.green),
+            _buildBadge("ID", _rollNo, Colors.blueGrey),
+          ],
         )
       ],
     );
@@ -347,35 +349,26 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        FadeInRight(
-          child: _buildActionTile(
-            "Change Password", 
-            "Update your portal security", 
-            Icons.lock_reset_rounded, 
-            primaryPurple, 
-            _showPasswordSheet
-          ),
-        ),
+        _buildActionTile("Change Password", "Update security", Icons.lock_outline, primaryPurple, _showPasswordSheet),
         const SizedBox(height: 16),
-        FadeInRight(
-          delay: const Duration(milliseconds: 100),
-          child: _buildActionTile(
-            "Logout Session", 
-            "Sign out from this device", 
-            Icons.logout_rounded, 
-            Colors.redAccent, 
-            () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-              Navigator.popUntil(context, (route) => route.isFirst);
-            }
-          ),
-        ),
+        _buildActionTile("Logout", "Sign out from device", Icons.logout, Colors.redAccent, () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.clear();
+          Navigator.popUntil(context, (route) => route.isFirst);
+        }),
       ],
     );
   }
 
-  // --- REUSABLE UI HELPERS ---
+  // --- REUSABLE WIDGETS ---
+
+  Widget _buildBadge(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+      child: Text("$label: $value", style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+    );
+  }
 
   Widget _buildTextField(String label, TextEditingController ctrl, IconData icon, {bool isReadOnly = false, bool isLong = false}) {
     return Padding(
@@ -383,18 +376,17 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryPurple.withOpacity(0.7))),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryPurple)),
           const SizedBox(height: 8),
           TextField(
             controller: ctrl,
             readOnly: isReadOnly,
             maxLines: isLong ? 3 : 1,
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: isReadOnly ? Colors.grey : primaryPurple, size: 20),
+              prefixIcon: Icon(icon, color: isReadOnly ? Colors.grey : primaryPurple),
               filled: true,
-              fillColor: isReadOnly ? cardGrey : lightLavender.withOpacity(0.3),
+              fillColor: isReadOnly ? cardGrey : lightLavender.withOpacity(0.2),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.all(16),
             ),
           ),
         ],
@@ -406,19 +398,16 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
     return ListTile(
       onTap: tap,
       tileColor: cardGrey,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      leading: Icon(icon, color: color),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+      subtitle: Text(sub),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
     );
   }
 
   Widget _buildLoadingOverlay() {
-    return Container(
-      color: Colors.black54, 
-      child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-    );
+    return Container(color: Colors.black45, child: const Center(child: CircularProgressIndicator(color: Colors.white)));
   }
 
   void _showPasswordSheet() {
@@ -431,47 +420,40 @@ class _StudentProfileState extends State<StudentProfile> with TickerProviderStat
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 30, right: 30, top: 20),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
         decoration: BoxDecoration(color: bgWhite, borderRadius: const BorderRadius.vertical(top: Radius.circular(30))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 25),
-            const Text("Update Security", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 25),
-            _buildSheetField(oldC, "Current Password", Icons.lock_outline_rounded),
-            const SizedBox(height: 15),
-            _buildSheetField(newC, "New Password", Icons.lock_reset_rounded),
-            const SizedBox(height: 15),
-            _buildSheetField(confC, "Confirm Password", Icons.check_circle_outline_rounded),
-            const SizedBox(height: 30),
+            const Text("Update Password", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            _buildSheetField(oldC, "Old Password"),
+            const SizedBox(height: 10),
+            _buildSheetField(newC, "New Password"),
+            const SizedBox(height: 10),
+            _buildSheetField(confC, "Confirm Password"),
+            const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryPurple,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryPurple, minimumSize: const Size(double.infinity, 50)),
               onPressed: () => _handlePasswordUpdate(oldC.text, newC.text, confC.text),
-              child: const Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text("UPDATE", style: TextStyle(color: Colors.white)),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSheetField(TextEditingController ctrl, String hint, IconData icon) {
+  Widget _buildSheetField(TextEditingController ctrl, String hint) {
     return TextField(
       controller: ctrl,
       obscureText: true,
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: primaryPurple),
         filled: true,
         fillColor: cardGrey,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
       ),
     );
   }

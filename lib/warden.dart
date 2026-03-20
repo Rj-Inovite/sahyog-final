@@ -7,17 +7,18 @@ import 'dart:ui';
 import 'register.dart'; 
 import 'warden-response.dart'; 
 import 'warden_profile.dart'; 
+import 'warden_std_leave_approve.dart'; 
 import 'data/models/network/api_service.dart'; 
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/warden_list_response.dart';
 
-// --- DESIGN SYSTEM (Indigo Professional Palette) ---
-const Color primaryIndigo = Color(0xFF3F51B5); // Indigo
-const Color darkIndigo = Color(0xFF303F9F);    // Deep Indigo
-const Color backgroundWhite = Color(0xFFFFFFFF); // Pure White Background
+// --- DESIGN SYSTEM ---
+const Color primaryIndigo = Color(0xFF3F51B5); 
+const Color darkIndigo = Color(0xFF303F9F);    
+const Color backgroundWhite = Color(0xFFFFFFFF); 
 const Color textDark = Color(0xFF2D3436);
 const Color successGreen = Color(0xFF00B894);
-const Color cardShadow = Color(0x0F000000); // Subtle indigo-tinted shadow
+const Color cardShadow = Color(0x0F000000); 
 
 class WardenDashboard extends StatefulWidget {
   final Map<String, String> userData;
@@ -38,7 +39,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
       ConsoleHome(userData: widget.userData),
       const StudentDirectoryPage(), 
       const WardenInboxPage(), 
-      const AdminSetupPage(),
     ];
   }
 
@@ -66,9 +66,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
                 onPressed: () {
                   Navigator.push(
                     context, 
-                    MaterialPageRoute(
-                      builder: (context) => WardenProfilePage(userData: widget.userData)
-                    ),
+                    MaterialPageRoute(builder: (context) => WardenProfilePage(userData: widget.userData)),
                   );
                 },
               ),
@@ -190,8 +188,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
         children: [
           const Text("Welcome Back,", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 5),
-          Text(displayName, 
-            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
           Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
@@ -259,7 +256,8 @@ class _ConsoleHomeState extends State<ConsoleHome> {
       childAspectRatio: 1.25,
       children: [
         _moduleCard(context, "Room Allotment", Icons.grid_view_rounded, const RoomInventoryPage(), "Manage Allotments"),
-        _moduleCard(context, "Std attendance", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
+        _moduleCard(context, "Std Attendance", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
+        _moduleCard(context, "Leave Records", Icons.time_to_leave_rounded, const WardenStdLeaveApprovePage(), "Approve Requests"),
         _moduleCard(context, "Staff", Icons.supervised_user_circle_rounded, const StaffManagementPage(), "Warden Directory"),
         _moduleCard(context, "Security Logs", Icons.security_rounded, const GateRecordsPage(), "Entry/Exit Log"),
       ],
@@ -291,6 +289,8 @@ class _ConsoleHomeState extends State<ConsoleHome> {
     );
   }
 }
+
+// ================= STUDENTS DIRECTORY =================
 
 class StudentDirectoryPage extends StatefulWidget {
   const StudentDirectoryPage({super.key});
@@ -332,7 +332,6 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
         }
       }
     } catch (e) {
-      debugPrint("Sahyog Student Sync Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -350,7 +349,6 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
               ? const Center(child: Text("No Students Found", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))
               : ListView.builder(
                   padding: const EdgeInsets.all(20),
-                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: _students.length,
                   itemBuilder: (ctx, i) => _buildStudentCard(_students[i]),
                 ),
@@ -396,6 +394,110 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
   }
 }
 
+// ================= ATTENDANCE PAGE (API INTEGRATED) =================
+
+class AttendancePage extends StatefulWidget {
+  const AttendancePage({super.key});
+
+  @override
+  State<AttendancePage> createState() => _AttendancePageState();
+}
+
+class _AttendancePageState extends State<AttendancePage> {
+  bool _isLoading = true;
+  AttendanceResponse? _attendanceData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAttendance();
+  }
+
+  Future<void> _fetchAttendance() async {
+    setState(() => _isLoading = true);
+    final response = await apiService.getHostelAttendance();
+    if (mounted) {
+      setState(() {
+        _attendanceData = response;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      appBar: AppBar(
+        title: const Text("Daily Attendance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
+        backgroundColor: primaryIndigo,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _isLoading 
+      ? const Center(child: CircularProgressIndicator(color: primaryIndigo))
+      : Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(25),
+            decoration: BoxDecoration(
+              color: primaryIndigo.withOpacity(0.05),
+              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text("Records Found", style: TextStyle(color: Colors.grey, fontSize: 12)), 
+                  Text("${_attendanceData?.summary?.totalRecords ?? 0} Students", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  const Text("Present Count", style: TextStyle(color: Colors.grey, fontSize: 12)), 
+                  Text("${_attendanceData?.summary?.present ?? 0} Active", style: const TextStyle(color: successGreen, fontWeight: FontWeight.bold, fontSize: 16))
+                ]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _attendanceData == null || _attendanceData!.data.isEmpty
+            ? const Center(child: Text("No records for today"))
+            : ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: _attendanceData!.data.length,
+                itemBuilder: (ctx, i) {
+                  final student = _attendanceData!.data[i];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white, 
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 4, offset: Offset(0, 2))],
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: student.status == 'present' ? successGreen.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                        child: Icon(Icons.person_rounded, color: student.status == 'present' ? successGreen : Colors.red)
+                      ),
+                      title: Text("${student.firstName} ${student.lastName}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(student.studentCode, style: const TextStyle(fontSize: 10)),
+                      trailing: Text(student.status.toUpperCase(), 
+                        style: TextStyle(color: student.status == 'present' ? successGreen : Colors.red, fontWeight: FontWeight.w900, fontSize: 10)),
+                    ),
+                  );
+                },
+              ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ================= STAFF MANAGEMENT =================
+
 class StaffManagementPage extends StatefulWidget {
   const StaffManagementPage({super.key});
   @override
@@ -424,11 +526,8 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
             _isLoading = false; 
           });
         }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint("Staff Fetch Error (Sahyog API): $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -455,7 +554,6 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
               ? const Center(child: Text("No Staff Members Found"))
               : ListView.builder(
                   padding: const EdgeInsets.all(20),
-                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: _wardens.length,
                   itemBuilder: (ctx, i) => _buildWardenTile(_wardens[i]),
                 ),
@@ -465,7 +563,6 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
 
   Widget _buildWardenTile(Warden warden) {
     bool isMe = warden.wardenName == _currentUser;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
@@ -479,22 +576,41 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
           backgroundColor: isMe ? primaryIndigo : primaryIndigo.withOpacity(0.1), 
           child: Icon(Icons.verified_user_rounded, color: isMe ? Colors.white : primaryIndigo, size: 20)
         ),
-        title: Row(
-          children: [
-            Text(warden.wardenName ?? "Unknown Warden", style: const TextStyle(fontWeight: FontWeight.w900)),
-            if (isMe) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: primaryIndigo.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
-                child: const Text("YOU", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: primaryIndigo)),
-              )
-            ]
-          ],
-        ),
+        title: Text(warden.wardenName ?? "Unknown Warden", style: const TextStyle(fontWeight: FontWeight.w900)),
         subtitle: Text("${warden.email ?? ''} | ${warden.mobile ?? ''}", style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
         onTap: () {},
+      ),
+    );
+  }
+}
+
+// ================= OTHER MODULES (INVENTORY, COMPLAINTS, LOGS) =================
+
+class RoomInventoryPage extends StatelessWidget {
+  const RoomInventoryPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      appBar: AppBar(title: const Text("Hostel Bed Layout"), backgroundColor: primaryIndigo, iconTheme: const IconThemeData(color: Colors.white)),
+      body: GridView.builder(
+        padding: const EdgeInsets.all(20),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 12, crossAxisSpacing: 12),
+        itemCount: 20,
+        itemBuilder: (ctx, i) => Container(
+          decoration: BoxDecoration(
+            color: i % 3 != 0 ? primaryIndigo.withOpacity(0.05) : successGreen.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: i % 3 != 0 ? primaryIndigo.withOpacity(0.2) : successGreen.withOpacity(0.2)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text("${101 + i}", style: TextStyle(fontWeight: FontWeight.w900, color: i % 3 != 0 ? primaryIndigo : successGreen)),
+              Icon(i % 3 != 0 ? Icons.person_rounded : Icons.check_circle_outline_rounded, size: 14, color: i % 3 != 0 ? primaryIndigo : successGreen),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -502,62 +618,27 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
 
 class ComplaintManagementPage extends StatelessWidget {
   const ComplaintManagementPage({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Maintenance Tickets"), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(title: const Text("Maintenance Tickets"), backgroundColor: primaryIndigo, iconTheme: const IconThemeData(color: Colors.white)),
       body: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: 4,
         itemBuilder: (ctx, i) => Container(
           margin: const EdgeInsets.only(bottom: 15),
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Colors.grey.shade100),
-            boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 5, offset: Offset(0, 2))],
-          ),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 5)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(i == 0 ? "Critical: Water Leak" : "Routine Checkup", 
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                  Icon(Icons.circle, color: i == 0 ? Colors.red : Colors.orange, size: 12),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text("Room: ${101+i} | Request #882$i", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Water Leak Room ${101+i}", style: const TextStyle(fontWeight: FontWeight.w900)), const Icon(Icons.circle, color: Colors.red, size: 12)]),
               const Divider(height: 30),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryIndigo, 
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0
-                      ),
-                      onPressed: () {},
-                      child: const Text("Assign Technician", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton(onPressed: (){}, icon: const Icon(Icons.chat_bubble_outline_rounded, color: primaryIndigo)),
-                ],
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: primaryIndigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                onPressed: () {},
+                child: const Center(child: Text("Assign Technician", style: TextStyle(color: Colors.white))),
               )
             ],
           ),
@@ -567,154 +648,28 @@ class ComplaintManagementPage extends StatelessWidget {
   }
 }
 
-class RoomInventoryPage extends StatelessWidget {
-  const RoomInventoryPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Hostel Bed Layout"), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(20),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1,
-        ),
-        itemCount: 20,
-        itemBuilder: (ctx, i) {
-          bool isOccupied = i % 3 != 0;
-          return Container(
-            decoration: BoxDecoration(
-              color: isOccupied ? primaryIndigo.withOpacity(0.05) : successGreen.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: isOccupied ? primaryIndigo.withOpacity(0.2) : successGreen.withOpacity(0.2)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("${101 + i}", style: TextStyle(fontWeight: FontWeight.w900, color: isOccupied ? primaryIndigo : successGreen)),
-                const SizedBox(height: 4),
-                Icon(isOccupied ? Icons.person_rounded : Icons.check_circle_outline_rounded, size: 14, color: isOccupied ? primaryIndigo : successGreen),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class AttendancePage extends StatelessWidget {
-  const AttendancePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Daily Attendance"), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(25),
-            decoration: BoxDecoration(
-              color: primaryIndigo.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Batch", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("March 19, 2026", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Status", style: TextStyle(color: Colors.grey, fontSize: 12)), Text("78% Present", style: TextStyle(color: primaryIndigo, fontWeight: FontWeight.bold, fontSize: 16))]),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: 10,
-              itemBuilder: (ctx, i) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white, 
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 4, offset: Offset(0, 2))],
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(backgroundColor: Colors.blueGrey.shade50, child: Icon(Icons.person_rounded, color: primaryIndigo.withOpacity(0.3))),
-                  title: Text("Student #$i", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  trailing: Switch(value: true, activeColor: successGreen, onChanged: (v){}),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: SizedBox(
-              width: double.infinity, height: 60,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: primaryIndigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                onPressed: () {},
-                child: const Text("SUBMIT ATTENDANCE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-}
-
 class GateRecordsPage extends StatelessWidget {
   const GateRecordsPage({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Campus Access Log"), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(title: const Text("Campus Access Log"), backgroundColor: primaryIndigo, iconTheme: const IconThemeData(color: Colors.white)),
       body: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: 15,
-        itemBuilder: (ctx, i) {
-          bool isEntry = i % 2 == 0;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade100)),
-            child: Row(
-              children: [
-                Icon(isEntry ? Icons.login_rounded : Icons.logout_rounded, color: isEntry ? successGreen : primaryIndigo),
-                const SizedBox(width: 15),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Student #102$i", style: const TextStyle(fontWeight: FontWeight.bold)), Text(isEntry ? "Hostel Entry" : "Gate Exit", style: const TextStyle(color: Colors.grey, fontSize: 12))])),
-                const Text("08:45 PM", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-              ],
-            ),
-          );
-        },
+        itemBuilder: (ctx, i) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade100)),
+          child: Row(
+            children: [
+              Icon(i % 2 == 0 ? Icons.login_rounded : Icons.logout_rounded, color: i % 2 == 0 ? successGreen : primaryIndigo),
+              const SizedBox(width: 15),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Student #102$i", style: const TextStyle(fontWeight: FontWeight.bold)), const Text("08:45 PM", style: TextStyle(color: Colors.grey, fontSize: 12))])),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -722,53 +677,26 @@ class GateRecordsPage extends StatelessWidget {
 
 class OccupancyStatsPage extends StatelessWidget {
   const OccupancyStatsPage({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Hostel Utilization"), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(40),
+      appBar: AppBar(title: const Text("Hostel Utilization"), backgroundColor: primaryIndigo, iconTheme: const IconThemeData(color: Colors.white)),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("Overall Occupancy", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 40),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                const SizedBox(width: 220, height: 220, child: CircularProgressIndicator(value: 0.94, strokeWidth: 15, color: primaryIndigo, backgroundColor: Color(0xFFEEEEEE))),
-                const Column(mainAxisSize: MainAxisSize.min, children: [Text("94%", style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900)), Text("Occupied", style: TextStyle(color: Colors.grey))]),
-              ],
-            ),
-            const SizedBox(height: 50),
-            _buildStatRow("Total Bed Capacity", "250"),
-            _buildStatRow("Current Residents", "235"),
-            _buildStatRow("Available Units", "15"),
+            const Text("94% Occupied", style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 20),
+            const Text("235/250 Beds Assigned", style: TextStyle(color: Colors.grey)),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text(label, style: const TextStyle(fontWeight: FontWeight.bold)), Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: primaryIndigo, fontSize: 18))],
-      ),
-    );
-  }
 }
+
+// ================= COMPONENTS =================
 
 class ShinyRegistryButton extends StatefulWidget {
   const ShinyRegistryButton({super.key});
@@ -798,13 +726,13 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
               colors: const [primaryIndigo, Colors.white, primaryIndigo],
               stops: [_controller.value - 0.2, _controller.value, _controller.value + 0.2],
             ),
-            boxShadow: [BoxShadow(color: primaryIndigo.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+            boxShadow: [BoxShadow(color: primaryIndigo.withOpacity(0.3), blurRadius: 15)],
           ),
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterStudent())),
-            icon: const Icon(Icons.person_add_rounded, color: Color.fromRGBO(249, 252, 253, 1), size: 28),
-            label: const Text("NEW STUDENT  ATTENDANCE REGISTRATION", style: TextStyle(color: Color.fromRGBO(248, 254, 255, 1), fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+            icon: const Icon(Icons.person_add_rounded, color: Colors.white, size: 28),
+            label: const Text("NEW STUDENT REGISTRATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
           ),
         );
       },
@@ -815,11 +743,5 @@ class _ShinyRegistryButtonState extends State<ShinyRegistryButton> with SingleTi
 class WardenInboxPage extends StatelessWidget {
   const WardenInboxPage({super.key});
   @override
-  Widget build(BuildContext context) => const Center(child: Text("Communication Hub", style: TextStyle(fontWeight: FontWeight.bold, color: textDark)));
-}
-
-class AdminSetupPage extends StatelessWidget {
-  const AdminSetupPage({super.key});
-  @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [const ListTile(leading: Icon(Icons.sync_lock_rounded, color: primaryIndigo), title: Text("Force System Sync")), const Divider(), ListTile(leading: const Icon(Icons.logout_rounded, color: Colors.red), title: const Text("Logout"), onTap: () => Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false))]);
+  Widget build(BuildContext context) => const Center(child: Text("Communication Hub Active", style: TextStyle(fontWeight: FontWeight.bold, color: textDark)));
 }

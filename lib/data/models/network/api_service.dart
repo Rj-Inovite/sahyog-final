@@ -2,19 +2,19 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:my_app/data/models/child_profile_response.dart';
 
 // --- MODELS ---
+import 'package:my_app/data/models/child_profile_response.dart';
 import 'package:my_app/data/models/my_hostel_info_response.dart';
+import 'package:my_app/data/models/network/auth_local_storage.dart';
 import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/network/my_room_response.dart'; 
- // Verified Import
+import 'package:my_app/data/models/network/leave_response.dart';
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
-import 'auth_local_storage.dart';
 
 /// --- AUTH INTERCEPTOR ---
 class AuthInterceptor extends Interceptor {
@@ -54,6 +54,7 @@ class ApiService {
       baseUrl: "https://devsahyog.myakola.com/api/",
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
+      validateStatus: (status) => status != null && status < 500,
     ));
 
     _dio.interceptors.add(AuthInterceptor());
@@ -110,35 +111,123 @@ class ApiService {
     }
   }
 
-  // ================= PARENT APIS (Elaborated) =================
+  Future<dynamic> getWardenLeaves() async {
+    try {
+      final response = await _dio.get("warden/leaves");
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data; 
+      }
+      return [];
+    } catch (e) {
+      return getWardenPendingLeaves();
+    }
+  }
 
-  /// Fetches child profile details for the logged-in parent
+  Future<List<dynamic>> getWardenPendingLeaves() async {
+    try {
+      final response = await _dio.get("warden/leaves/pending");
+      if (response.statusCode == 200 && response.data != null) {
+        if (response.data is Map && response.data.containsKey('data')) {
+          return response.data['data'] as List<dynamic>;
+        }
+        return response.data as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Warden Pending Leaves Error: $e");
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> wardenApproveLeave({
+    required int studentId,
+    required int leaveId,
+    required bool isApprove,
+  }) async {
+    try {
+      final String endpoint = isApprove ? "warden/leave/approve" : "warden/leave/$leaveId/reject";
+      final response = await _dio.post(
+        endpoint,
+        data: isApprove ? {"student_id": studentId, "leave_id": leaveId} : null,
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data;
+      }
+      return {"success": true, "message": "Action completed"};
+    } on DioException catch (e) {
+      _handleDioError("Warden Leave Action", e);
+      return {"success": false, "message": e.message};
+    }
+  }
+
+  // ================= ATTENDANCE APIS =================
+
+  /// ✅ Integrated: hostel/attendance
+  Future<AttendanceResponse?> getHostelAttendance() async {
+    try {
+      final response = await _dio.get("hostel/attendance");
+      if (response.statusCode == 200 && response.data != null) {
+        return AttendanceResponse.fromJson(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      _handleDioError("Hostel Attendance", e);
+      return null;
+    }
+  }
+
+  // ================= PARENT / GUARDIAN APIS =================
+
   Future<ChildProfileResponse?> getChildProfile() async {
     try {
       final response = await _dio.get("parent/child-profile");
       if (response.statusCode == 200 && response.data != null) {
-        // Correctly mapping the JSON data to our model
         return ChildProfileResponse.fromJson(response.data);
       }
       return null;
     } on DioException catch (e) {
       _handleDioError("Child Profile", e);
       return null;
-    } catch (e) {
-      debugPrint("Unexpected Error in getChildProfile: $e");
-      return null;
     }
   }
 
-  // ================= UTILITIES & SHARED =================
+  Future<List<dynamic>> getLeaves([int? userId]) async {
+    List<String> endpoints = ["guardian/leaves/pending", "guardian/leaves", "parent/leaves", "leaves"];
+    for (String path in endpoints) {
+      try {
+        final response = await _dio.get(path);
+        if (response.statusCode == 200 && response.data != null) {
+          if (response.data is Map && response.data.containsKey('data')) {
+            return response.data['data'] as List<dynamic>;
+          } else if (response.data is List) {
+            return response.data;
+          }
+        }
+      } catch (e) { continue; }
+    }
+    return [];
+  }
 
-  void _handleDioError(String apiName, DioException e) {
-    if (e.response?.statusCode == 404) {
-      debugPrint("Sahyog API 404: $apiName endpoint not found at ${e.requestOptions.path}");
-    } else if (e.response?.statusCode == 401) {
-      debugPrint("Sahyog API 401: Unauthorized access to $apiName");
-    } else {
-      debugPrint("Dio Error ($apiName): ${e.message} | Code: ${e.response?.statusCode}");
+  Future<dynamic> parentApproveLeave({required int studentId, required int leaveId}) async {
+    try {
+      final response = await _dio.post(
+        "guardian/leave/approve", 
+        data: {"student_id": studentId, "leave_id": leaveId},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      _handleDioError("Parent Leave Approval", e);
+      rethrow;
+    }
+  }
+
+  Future<dynamic> parentRejectLeave(int leaveId) async {
+    try {
+      final response = await _dio.post("guardian/leave/$leaveId/reject");
+      return response.data;
+    } on DioException catch (e) {
+      _handleDioError("Parent Leave Rejection", e);
+      rethrow;
     }
   }
 
@@ -183,10 +272,7 @@ class ApiService {
 
   Future<dynamic> submitEnrollment(int studentId, List<double> faceVector) async {
     try {
-      final payload = {
-        "student_id": studentId,
-        "face_vector": faceVector,
-      };
+      final payload = {"student_id": studentId, "face_vector": faceVector};
       return await client.submitEnrollment(payload);
     } catch (e) {
       debugPrint("Enrollment Submission Error: $e");
@@ -197,29 +283,8 @@ class ApiService {
   // ================= PROFILE & AUTH APIS =================
   
   Future<dynamic> getProfile() => client.getProfile();
-
-  Future<PasswordUpdateResponse> updatePassword(PasswordUpdateRequest request) {
-    return client.updatePassword(request);
-  }
-
+  Future<PasswordUpdateResponse> updatePassword(PasswordUpdateRequest request) => client.updatePassword(request);
   Future<void> logout() => client.logout();
-
-  // ================= LEAVE APIS =================
-
-  Future<List<dynamic>> getLeaves([int? userId]) async {
-    try {
-      final dynamic response = await client.getLeaves();
-      if (response is Map && response.containsKey('data')) {
-        return response['data'] as List<dynamic>;
-      } else if (response is List) {
-        return response;
-      }
-      return [];
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) return []; 
-      rethrow;
-    }
-  }
 
   Future<dynamic> applyLeave({
     int? userId, 
@@ -228,23 +293,27 @@ class ApiService {
     required String endDate,
     required String reason,
   }) async {
-    final payload = {
-      "leave_type": leaveType,
-      "start_date": startDate,
-      "end_date": endDate,
-      "reason": reason,
-    };
-    return await client.applyLeave(payload);
+    try {
+      final payload = {
+        "leave_type": leaveType,
+        "start_date": startDate,
+        "end_date": endDate,
+        "reason": reason,
+        if (userId != null) "user_id": userId,
+      };
+      final response = await _dio.post("leaves/apply", data: payload);
+      return response.data;
+    } on DioException catch (e) {
+      _handleDioError("Apply Leave", e);
+      rethrow;
+    }
   }
 
   // ================= CHAT APIS =================
 
   Future<dynamic> setupChat() async {
     try {
-      return await client.setupConversation({
-        "name": "General Chat Room",
-        "type": "group"
-      });
+      return await client.setupConversation({"name": "General Chat Room", "type": "group"});
     } catch (e) {
       debugPrint("Setup Chat Error: $e");
       return null;
@@ -253,10 +322,7 @@ class ApiService {
   
   Future<dynamic> sendMessage(int conversationId, String message) async {
     try {
-      final payload = {
-        "conversation_id": conversationId,
-        "message": message
-      };
+      final payload = {"conversation_id": conversationId, "message": message};
       return await client.sendWardenMessage(payload);
     } catch (e) {
       debugPrint("Send Message Error: $e");
@@ -268,9 +334,7 @@ class ApiService {
     try {
       return await client.getChatHistory(conversationId);
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        return {"success": true, "messages": []};
-      }
+      if (e.response?.statusCode == 404) return {"success": true, "messages": []};
       rethrow;
     }
   }
@@ -278,19 +342,13 @@ class ApiService {
   Future<dynamic> deleteMessage(int messageId) async {
     try {
       return await _dio.delete("chat/messages/$messageId");
-    } catch (e) {
-      debugPrint("Delete Error: $e");
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   Future<dynamic> editMessage(int messageId, String newText) async {
     try {
       return await _dio.put("chat/messages/$messageId", data: {"message": newText});
-    } catch (e) {
-      debugPrint("Edit Error: $e");
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   Future<dynamic> uploadChatFile(int conversationId, File file) async {
@@ -301,10 +359,77 @@ class ApiService {
         "file": await MultipartFile.fromFile(file.path, filename: fileName),
       });
       return await _dio.post("chat/upload", data: formData);
-    } catch (e) {
-      debugPrint("File Upload Error: $e");
-      return null;
+    } catch (e) { return null; }
+  }
+
+  // ================= UTILITIES & SHARED =================
+
+  void _handleDioError(String apiName, DioException e) {
+    if (e.response?.statusCode == 404) {
+      debugPrint("Sahyog API 404: $apiName endpoint not found at ${e.requestOptions.path}");
+    } else if (e.response?.statusCode == 401) {
+      debugPrint("Sahyog API 401: Unauthorized access to $apiName");
+    } else if (e.response?.statusCode == 500) {
+      debugPrint("Sahyog API 500: Server crashed during $apiName call.");
+    } else {
+      debugPrint("Dio Error ($apiName): ${e.message} | Code: ${e.response?.statusCode}");
     }
+  }
+}
+
+// --- ATTENDANCE MODELS ---
+
+class AttendanceResponse {
+  final bool success;
+  final int? hostelId;
+  final AttendanceSummary? summary;
+  final List<AttendanceData> data;
+
+  AttendanceResponse({required this.success, this.hostelId, this.summary, required this.data});
+
+  factory AttendanceResponse.fromJson(Map<String, dynamic> json) {
+    return AttendanceResponse(
+      success: json['success'] ?? false,
+      hostelId: json['hostel_id'],
+      summary: json['summary'] != null ? AttendanceSummary.fromJson(json['summary']) : null,
+      data: (json['data'] as List? ?? []).map((e) => AttendanceData.fromJson(e)).toList(),
+    );
+  }
+}
+
+class AttendanceSummary {
+  final int totalRecords;
+  final int present;
+  final int absent;
+
+  AttendanceSummary({required this.totalRecords, required this.present, required this.absent});
+
+  factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
+    return AttendanceSummary(
+      totalRecords: json['total_records'] ?? 0,
+      present: json['present'] ?? 0,
+      absent: json['absent'] ?? 0,
+    );
+  }
+}
+
+class AttendanceData {
+  final int id;
+  final String status;
+  final String firstName;
+  final String lastName;
+  final String studentCode;
+
+  AttendanceData({required this.id, required this.status, required this.firstName, required this.lastName, required this.studentCode});
+
+  factory AttendanceData.fromJson(Map<String, dynamic> json) {
+    return AttendanceData(
+      id: json['id'] ?? 0,
+      status: json['status'] ?? 'absent',
+      firstName: json['student_first_name'] ?? '',
+      lastName: json['student_last_name'] ?? '',
+      studentCode: json['student_code'] ?? '',
+    );
   }
 }
 

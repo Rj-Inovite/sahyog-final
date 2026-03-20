@@ -48,19 +48,36 @@ abstract class RestAPIClient {
   @GET("user/profile")
   Future<dynamic> getProfile();
 
+  /// Updates Name, Mobile, and Address (Requires Auth Token)
+  @PUT("user/update")
+  Future<dynamic> updateProfile(@Body() Map<String, dynamic> body);
+
+  /// Fetches specific student profile details for the Identity tab
+  @GET("student/view/{id}")
+  Future<dynamic> getStudentProfileView(@Path("id") int id);
+
   @POST("update-password")
   Future<PasswordUpdateResponse> updatePassword(@Body() PasswordUpdateRequest request);
 
-  // ================= LEAVE APIS =================
+  // ================= LEAVE APIS (STUDENT) =================
   
   @GET("leaves")
   Future<dynamic> getLeaves();
 
+  /// Existing Student Apply Leave - DO NOT DISTURB
   @POST("leaves/apply")
   Future<LeaveResponse> applyLeave(@Body() Map<String, dynamic> body);
 
   @DELETE("leaves/{id}")
   Future<void> cancelLeave(@Path("id") int id);
+
+  // ================= GUARDIAN / PARENT LEAVE APIS =================
+
+  /// ✅ NEW: Approves a student's leave request by the guardian
+  /// Endpoint: https://devsahyog.myakola.com/api/guardian/leave/approve
+  /// Payload: {"student_id": int, "leave_id": int}
+  @POST("guardian/leave/approve")
+  Future<dynamic> approveLeaveByParent(@Body() Map<String, dynamic> body);
 
   // ================= CHAT APIS =================
   

@@ -1,29 +1,30 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Centralized local storage for Sahyog authentication.
-/// Purely functional: Stores and retrieves credentials without affecting other logic.
 class AuthLocalStorage {
   // --- STORAGE KEYS ---
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
   static const String _userRoleKey = 'user_role';
-  static const String _userNameKey = 'user_name'; 
+  static const String _userNameKey = 'user_name';
 
-  // Private constructor to prevent instantiation
-  AuthLocalStorage._(); 
+  AuthLocalStorage._(); // Private constructor
 
   // ================= SAVE DATA METHODS =================
 
-  /// Save token, user id, and optional role/name after successful login.
+  /// Save auth data. Handles ID as dynamic to support both String and Int from APIs.
   static Future<void> saveAuthData({
     required String token,
-    required String id,
+    required dynamic id, // Dynamic to handle int or string from different APIs
     String? role,
     String? name,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
-    await prefs.setString(_userIdKey, id);
+    
+    // Safety: Convert ID to string before saving to SharedPreferences
+    await prefs.setString(_userIdKey, id.toString());
+    
     if (role != null) await prefs.setString(_userRoleKey, role);
     if (name != null) await prefs.setString(_userNameKey, name);
   }
@@ -42,16 +43,18 @@ class AuthLocalStorage {
     return (token != null && token.isNotEmpty) ? token : null;
   }
 
-  /// HELPER: Returns the full Authorization Header Map.
-  /// Use this in your Dio/HTTP calls to keep code clean.
+  /// HELPER: Returns the full Authorization Header Map for Dio/HTTP calls.
   static Future<Map<String, String>> getAuthHeader() async {
     final token = await getToken();
     return {
       'Authorization': 'Bearer ${token ?? ""}',
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
     };
   }
 
+  /// Returns User ID as a String. 
+  /// Use int.parse() in your API call if the backend requires an integer.
   static Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userIdKey);
@@ -72,16 +75,17 @@ class AuthLocalStorage {
   /// Decides whether to show Login or Dashboard on App Start.
   static Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null;
+    return token != null && token.isNotEmpty;
   }
 
-  /// Quick check for role-based UI rendering
+  /// Quick check for role-based UI rendering.
+  /// Supports both 'warden' and 'manager' roles as per your Postman logs.
   static Future<bool> isWarden() async {
-    final role = await getUserRole();
-    return role?.toLowerCase() == 'warden' || role?.toLowerCase() == 'manager';
+    final role = (await getUserRole())?.toLowerCase();
+    return role == 'warden' || role == 'manager';
   }
 
-  /// Safe Logout: Removes credentials but keeps app settings (like theme).
+  /// Safe Logout: Removes credentials but keeps app settings.
   static Future<void> clearAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
@@ -90,7 +94,7 @@ class AuthLocalStorage {
     await prefs.remove(_userNameKey);
   }
 
-  /// Total Reset: Use with caution.
+  /// Total Reset: Use for debugging or factory reset logic.
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
