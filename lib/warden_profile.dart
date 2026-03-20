@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 // --- THEME CONSTANTS (Matching Sahyog Dashboard) ---
-const Color primaryYellow = Color.fromRGBO(218, 136, 13, 1);
-const Color deepAmber = Color(0xFFFFB300);
+const Color primaryYellow = Color.from(alpha: 1, red: 0.188, green: 0.294, blue: 0.78);
+const Color deepAmber = Color.fromRGBO(63, 78, 214, 1);
 const Color bgWhite = Color(0xFFFAFAFA);
 const Color cardWhite = Colors.white;
-const Color sunsetOrange = Color(0xFFFF8C42);
+const Color sunsetOrange = Color.fromRGBO(81, 83, 223, 1);
 
 class WardenProfilePage extends StatefulWidget {
   final Map<String, String>? userData; // Added to accept login credentials

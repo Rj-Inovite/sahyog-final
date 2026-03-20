@@ -31,7 +31,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   int? _activeConversationId;
 
   // --- SAHYOG PREMIUM THEME ---
-  final Color primaryLavender = const Color(0xFF7E57C2);
+  final Color primaryLavender = const Color.fromRGBO(207, 16, 134, 1);
   final Color bgLavender = const Color(0xFFF3F2F7);
   final Color bubbleMe = const Color(0xFFDCF8C6); // WhatsApp Green style
   final Color bubbleThem = Colors.white;

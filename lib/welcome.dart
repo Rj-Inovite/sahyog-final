@@ -36,10 +36,10 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   Widget build(BuildContext context) {
     // Elegant Gradients
-    final List<Color> blueGradient = [const Color(0xFF0D47A1), const Color(0xFF1976D2), const Color(0xFF42A5F5)];
-    final List<Color> pinkGradient = [const Color(0xFF880E4F), const Color(0xFFC2185B), const Color(0xFFF06292)];
+    final List<Color> blueGradient = [const Color.fromRGBO(16, 27, 179, 1), const Color.fromRGBO(43, 14, 204, 1), const Color(0xFF42A5F5)];
+    final List<Color> pinkGradient = [const Color.fromRGBO(151, 12, 86, 1), const Color.fromRGBO(160, 8, 69, 1), const Color.fromRGBO(252, 127, 169, 1)];
     
-    final Color themeColor = isPink ? const Color(0xFFC2185B) : const Color(0xFF0D47A1);
+    final Color themeColor = isPink ? const Color.fromRGBO(185, 38, 97, 1) : const Color.fromRGBO(214, 18, 126, 1);
     final String hostelTitle = isPink ? "GIRLS HOSTEL" : "BOYS HOSTEL";
     final String logoAsset = isPink ? 'assets/images/g_logo.png' : 'assets/images/b_logo.png';
 

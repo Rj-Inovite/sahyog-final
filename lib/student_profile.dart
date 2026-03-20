@@ -20,9 +20,9 @@ class StudentProfile extends StatefulWidget {
 
 class _StudentProfileState extends State<StudentProfile> with TickerProviderStateMixin {
   // --- PREMIUM SAHYOG THEME COLORS ---
-  final Color primaryPurple = const Color.fromRGBO(179, 23, 218, 0.445); 
-  final Color accentPurple = const Color.fromRGBO(180, 8, 196, 0.801);
-  final Color deepPurple = const Color.fromRGBO(190, 6, 135, 1);
+  final Color primaryPurple = const Color.fromRGBO(206, 12, 125, 1); 
+  final Color accentPurple = const Color.fromRGBO(214, 46, 124, 0.952);
+  final Color deepPurple = const Color.fromRGBO(223, 36, 129, 1);
   final Color lightLavender = const Color(0xFFF3E5F5);
   final Color bgWhite = Colors.white;
   final Color cardGrey = const Color(0xFFF8F9FA);
