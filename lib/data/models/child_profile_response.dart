@@ -14,7 +14,7 @@ class ChildProfileResponse {
 
 class ChildData {
   final String fullName;
-  final String studentId;
+  final String studentId; // This is the 'student_code' from your API
   final String email;
   final String mobile;
   final AcademicDetails? academicDetails;
@@ -32,7 +32,9 @@ class ChildData {
   factory ChildData.fromJson(Map<String, dynamic> json) {
     return ChildData(
       fullName: json['full_name'] ?? 'N/A',
-      studentId: json['student_id'] ?? 'N/A',
+      // ✅ FIXED: Using 'student_code' to match your Postman response
+      // Adding a fallback to 'student_id' ensures other APIs don't break.
+      studentId: (json['student_code'] ?? json['student_id'] ?? '0').toString(),
       email: json['email'] ?? 'N/A',
       mobile: json['mobile'] ?? 'N/A',
       academicDetails: json['academic_details'] != null 
@@ -60,7 +62,7 @@ class AcademicDetails {
     );
   }
 
-  /// Helper to convert the API's ISO date string into a readable format (DD/MM/YYYY)
+  /// Helper to convert ISO date string into readable DD/MM/YYYY
   String get formattedDate {
     if (admissionDate == null) return "N/A";
     try {
@@ -85,7 +87,7 @@ class HostelInfo {
     );
   }
 
-  /// Helper to get a capitalized status for UI display
+  /// Helper for UI display
   String get displayStatus {
     if (status.isEmpty) return "Unknown";
     return status[0].toUpperCase() + status.substring(1).toLowerCase();

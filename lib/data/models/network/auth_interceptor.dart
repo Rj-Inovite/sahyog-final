@@ -3,8 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 // --- STORAGE ---
-// Ensure this path matches your project structure
-
+// Ensures the interceptor can pull the latest token from your local storage
 import 'package:my_app/data/models/network/auth_local_storage.dart'; 
 
 /// This Interceptor automatically adds the Bearer Token to every outgoing request.
@@ -21,7 +20,7 @@ class AuthInterceptor extends Interceptor {
       final String? token = await AuthLocalStorage.getToken();
 
       // 2. Standardize Headers for Laravel/PHP Backends
-      // These are vital for your 'guardian/leave/approve' and 'warden' POST requests.
+      // Essential for 'guardian/leave/approve', 'warden', and 'parent/ward/leave-history'
       options.headers['Accept'] = 'application/json';
       options.headers['Content-Type'] = 'application/json';
 
@@ -29,6 +28,7 @@ class AuthInterceptor extends Interceptor {
       if (token != null && token.isNotEmpty) {
         // Ensuring the format is exactly "Bearer <token>"
         options.headers['Authorization'] = 'Bearer $token';
+        debugPrint("--- AUTH: Token injected for ${options.path} ---");
       } else {
         debugPrint("--- AUTH: No Token Found for ${options.path} ---");
       }
@@ -59,8 +59,7 @@ class AuthInterceptor extends Interceptor {
       // Clear local storage so the app doesn't attempt to use an invalid session
       AuthLocalStorage.clearAuthData();
       
-      // NOTE: If you have a GlobalKey for Navigation, 
-      // you can trigger a push to LoginPage here.
+      // Optional: Add logic here to redirect the user to the Login Screen
     }
 
     // 6. Specific Logging for Route Errors (404)
@@ -70,8 +69,9 @@ class AuthInterceptor extends Interceptor {
 
     // 7. Handle Connection Issues (Timeouts)
     if (err.type == DioExceptionType.connectionTimeout || 
-        err.type == DioExceptionType.receiveTimeout) {
-      debugPrint("--- NETWORK ERROR: Timeout on ${err.requestOptions.path}. Check Sahyog Server status. ---");
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.connectionError) {
+      debugPrint("--- NETWORK ERROR: Connection issue on ${err.requestOptions.path}. ---");
     }
 
     // 8. Handle Specific Backend Errors (500)

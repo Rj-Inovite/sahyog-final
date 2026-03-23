@@ -12,6 +12,8 @@ import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/network/my_room_response.dart'; 
 import 'package:my_app/data/models/network/leave_response.dart';
+// ✅ ADDED: Import for your Parent Leave History Model
+import 'package:my_app/data/models/network/parent_leave_list.dart'; 
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -187,6 +189,20 @@ class ApiService {
       return null;
     } on DioException catch (e) {
       _handleDioError("Child Profile", e);
+      return null;
+    }
+  }
+
+  // ✅ NEW INTEGRATED API: Parent Ward Leave History
+  Future<ParentLeaveResponse?> getParentLeaveHistory() async {
+    try {
+      final response = await _dio.get("parent/ward/leave-history");
+      if (response.statusCode == 200 && response.data != null) {
+        return ParentLeaveResponse.fromJson(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      _handleDioError("Parent Leave History", e);
       return null;
     }
   }
@@ -377,7 +393,7 @@ class ApiService {
   }
 }
 
-// --- ATTENDANCE MODELS ---
+// --- ATTENDANCE MODELS (Kept intact) ---
 
 class AttendanceResponse {
   final bool success;
@@ -432,5 +448,5 @@ class AttendanceData {
     );
   }
 }
-
+ 
 final apiService = ApiService();

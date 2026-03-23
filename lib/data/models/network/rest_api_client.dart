@@ -1,3 +1,4 @@
+// ignore_for_file: unused_import
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
@@ -7,6 +8,9 @@ import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart';
 import 'package:my_app/data/models/warden_list_response.dart'; 
+// Ensure these match your actual file paths for the Parent Portal models
+import 'package:my_app/data/models/child_profile_response.dart'; 
+import 'package:my_app/data/models/network/parent_leave_list.dart';
 
 part 'rest_api_client.g.dart';
 
@@ -16,15 +20,12 @@ abstract class RestAPIClient {
 
   // ================= MANAGER / WARDEN APIS =================
 
-  /// Fetches the list of students for the manager/warden
   @GET("manager/student-list")
   Future<StudentListResponse> getStudentList();
 
-  /// Fetches the list of wardens/managers
   @GET("manager/warden-list")
   Future<WardenListResponse> getWardenList();
 
-  /// Fetches detailed student view from Web Dashboard
   @GET("student/view/{id}")
   Future<dynamic> getStudentView(@Path("id") int id);
 
@@ -33,7 +34,6 @@ abstract class RestAPIClient {
   @GET("public/pending-enrollment")
   Future<dynamic> getPendingEnrollments();
 
-  /// Enrollment submission for face vectors
   @POST("attendance-enrollment")
   Future<dynamic> submitEnrollment(@Body() Map<String, dynamic> body);
 
@@ -48,36 +48,45 @@ abstract class RestAPIClient {
   @GET("user/profile")
   Future<dynamic> getProfile();
 
-  /// Updates Name, Mobile, and Address (Requires Auth Token)
   @PUT("user/update")
   Future<dynamic> updateProfile(@Body() Map<String, dynamic> body);
 
-  /// Fetches specific student profile details for the Identity tab
   @GET("student/view/{id}")
   Future<dynamic> getStudentProfileView(@Path("id") int id);
 
   @POST("update-password")
   Future<PasswordUpdateResponse> updatePassword(@Body() PasswordUpdateRequest request);
 
-  // ================= LEAVE APIS (STUDENT) =================
+  // ================= STUDENT LEAVE APIS =================
   
   @GET("leaves")
   Future<dynamic> getLeaves();
 
-  /// Existing Student Apply Leave - DO NOT DISTURB
   @POST("leaves/apply")
   Future<LeaveResponse> applyLeave(@Body() Map<String, dynamic> body);
 
   @DELETE("leaves/{id}")
   Future<void> cancelLeave(@Path("id") int id);
 
-  // ================= GUARDIAN / PARENT LEAVE APIS =================
+  // ================= GUARDIAN / PARENT PORTAL APIS (NEW) =================
 
-  /// ✅ NEW: Approves a student's leave request by the guardian
-  /// Endpoint: https://devsahyog.myakola.com/api/guardian/leave/approve
+  /// Fetches the linked child's profile for the Parent Portal
+  @GET("parent/child-profile")
+  Future<ChildProfileResponse?> getChildProfile();
+
+  /// Fetches the leave history specifically for the Parent/Guardian view
+  @GET("parent/leave-history")
+  Future<ParentLeaveResponse?> getParentLeaveHistory();
+
+  /// ✅ Parent Leave Approval
   /// Payload: {"student_id": int, "leave_id": int}
   @POST("guardian/leave/approve")
   Future<dynamic> approveLeaveByParent(@Body() Map<String, dynamic> body);
+
+  /// ✅ Parent Leave Rejection
+  /// Payload: {"leave_id": int}
+  @POST("guardian/leave/reject")
+  Future<dynamic> rejectLeaveByParent(@Body() Map<String, dynamic> body);
 
   // ================= CHAT APIS =================
   

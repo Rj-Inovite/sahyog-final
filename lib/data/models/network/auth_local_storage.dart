@@ -23,7 +23,9 @@ class AuthLocalStorage {
     await prefs.setString(_tokenKey, token);
     
     // Safety: Convert ID to string before saving to SharedPreferences
-    await prefs.setString(_userIdKey, id.toString());
+    if (id != null) {
+      await prefs.setString(_userIdKey, id.toString());
+    }
     
     if (role != null) await prefs.setString(_userRoleKey, role);
     if (name != null) await prefs.setString(_userNameKey, name);
@@ -54,7 +56,6 @@ class AuthLocalStorage {
   }
 
   /// Returns User ID as a String. 
-  /// Use int.parse() in your API call if the backend requires an integer.
   static Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userIdKey);
@@ -79,10 +80,15 @@ class AuthLocalStorage {
   }
 
   /// Quick check for role-based UI rendering.
-  /// Supports both 'warden' and 'manager' roles as per your Postman logs.
   static Future<bool> isWarden() async {
     final role = (await getUserRole())?.toLowerCase();
     return role == 'warden' || role == 'manager';
+  }
+
+  /// Specific check for Parent role (Useful for your current Parent View integration)
+  static Future<bool> isParent() async {
+    final role = (await getUserRole())?.toLowerCase();
+    return role == 'parent' || role == 'guardian';
   }
 
   /// Safe Logout: Removes credentials but keeps app settings.
