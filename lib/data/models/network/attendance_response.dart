@@ -1,7 +1,17 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'attendance_response.g.dart';
+
+@JsonSerializable()
 class AttendanceResponse {
   final bool success;
+  
+  @JsonKey(name: 'hostel_id')
   final int? hostelId;
+  
   final AttendanceSummary? summary;
+  
+  @JsonKey(defaultValue: [])
   final List<AttendanceData> data;
 
   AttendanceResponse({
@@ -11,40 +21,59 @@ class AttendanceResponse {
     required this.data,
   });
 
-  factory AttendanceResponse.fromJson(Map<String, dynamic> json) {
-    return AttendanceResponse(
-      success: json['success'] ?? false,
-      hostelId: json['hostel_id'],
-      summary: json['summary'] != null ? AttendanceSummary.fromJson(json['summary']) : null,
-      data: (json['data'] as List? ?? []).map((e) => AttendanceData.fromJson(e)).toList(),
-    );
-  }
+  factory AttendanceResponse.fromJson(Map<String, dynamic> json) => 
+      _$AttendanceResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AttendanceResponseToJson(this);
 }
 
+@JsonSerializable()
 class AttendanceSummary {
+  @JsonKey(name: 'total_records', defaultValue: 0)
   final int totalRecords;
+  
+  @JsonKey(defaultValue: 0)
   final int present;
+  
+  @JsonKey(defaultValue: 0)
   final int absent;
 
-  AttendanceSummary({required this.totalRecords, required this.present, required this.absent});
+  AttendanceSummary({
+    required this.totalRecords, 
+    required this.present, 
+    required this.absent
+  });
 
-  factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
-    return AttendanceSummary(
-      totalRecords: json['total_records'] ?? 0,
-      present: json['present'] ?? 0,
-      absent: json['absent'] ?? 0,
-    );
-  }
+  factory AttendanceSummary.fromJson(Map<String, dynamic> json) => 
+      _$AttendanceSummaryFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AttendanceSummaryToJson(this);
 }
 
+@JsonSerializable()
 class AttendanceData {
+  @JsonKey(defaultValue: 0)
   final int id;
+
+  @JsonKey(name: 'student_id', defaultValue: 0)
   final int studentId;
+
+  @JsonKey(defaultValue: 'absent')
   final String status;
+
+  @JsonKey(name: 'attendance_date')
   final String? attendanceDate;
+
+  @JsonKey(name: 'attendance_session')
   final String? attendanceSession;
+
+  @JsonKey(name: 'student_first_name', defaultValue: '')
   final String firstName;
+
+  @JsonKey(name: 'student_last_name', defaultValue: '')
   final String lastName;
+
+  @JsonKey(name: 'student_code', defaultValue: '')
   final String studentCode;
 
   AttendanceData({
@@ -58,16 +87,8 @@ class AttendanceData {
     required this.studentCode,
   });
 
-  factory AttendanceData.fromJson(Map<String, dynamic> json) {
-    return AttendanceData(
-      id: json['id'] ?? 0,
-      studentId: json['student_id'] ?? 0,
-      status: json['status'] ?? 'absent',
-      attendanceDate: json['attendance_date'],
-      attendanceSession: json['attendance_session'],
-      firstName: json['student_first_name'] ?? '',
-      lastName: json['student_last_name'] ?? '',
-      studentCode: json['student_code'] ?? '',
-    );
-  }
+  factory AttendanceData.fromJson(Map<String, dynamic> json) => 
+      _$AttendanceDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AttendanceDataToJson(this);
 }

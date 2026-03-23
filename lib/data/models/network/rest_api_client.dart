@@ -8,9 +8,11 @@ import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart';
 import 'package:my_app/data/models/warden_list_response.dart'; 
-// Ensure these match your actual file paths for the Parent Portal models
 import 'package:my_app/data/models/child_profile_response.dart'; 
 import 'package:my_app/data/models/network/parent_leave_list.dart';
+
+// ✅ This import is critical for the new Attendance feature
+import 'package:my_app/data/models/network/attendance_response.dart';
 
 part 'rest_api_client.g.dart';
 
@@ -28,6 +30,10 @@ abstract class RestAPIClient {
 
   @GET("student/view/{id}")
   Future<dynamic> getStudentView(@Path("id") int id);
+
+  /// ✅ Fixed return type to match your JsonSerializable model
+  @GET("hostel/attendance")
+  Future<AttendanceResponse> getAttendance();
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 
@@ -68,23 +74,17 @@ abstract class RestAPIClient {
   @DELETE("leaves/{id}")
   Future<void> cancelLeave(@Path("id") int id);
 
-  // ================= GUARDIAN / PARENT PORTAL APIS (NEW) =================
+  // ================= GUARDIAN / PARENT PORTAL APIS =================
 
-  /// Fetches the linked child's profile for the Parent Portal
   @GET("parent/child-profile")
   Future<ChildProfileResponse?> getChildProfile();
 
-  /// Fetches the leave history specifically for the Parent/Guardian view
   @GET("parent/leave-history")
   Future<ParentLeaveResponse?> getParentLeaveHistory();
 
-  /// ✅ Parent Leave Approval
-  /// Payload: {"student_id": int, "leave_id": int}
   @POST("guardian/leave/approve")
   Future<dynamic> approveLeaveByParent(@Body() Map<String, dynamic> body);
 
-  /// ✅ Parent Leave Rejection
-  /// Payload: {"leave_id": int}
   @POST("guardian/leave/reject")
   Future<dynamic> rejectLeaveByParent(@Body() Map<String, dynamic> body);
 

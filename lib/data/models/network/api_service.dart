@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; 
 
 // --- MODELS ---
 import 'package:my_app/data/models/child_profile_response.dart';
@@ -12,8 +13,11 @@ import 'package:my_app/data/models/network/password_update_model.dart';
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/network/my_room_response.dart'; 
 import 'package:my_app/data/models/network/leave_response.dart';
-// ✅ ADDED: Import for your Parent Leave History Model
 import 'package:my_app/data/models/network/parent_leave_list.dart'; 
+
+// ✅ IMPORT YOUR GENERATED MODEL FILE HERE
+// This ensures the API returns the exact type the UI expects.
+import 'package:my_app/data/models/network/attendance_response.dart';
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -164,11 +168,18 @@ class ApiService {
 
   // ================= ATTENDANCE APIS =================
 
-  /// ✅ Integrated: hostel/attendance
-  Future<AttendanceResponse?> getHostelAttendance() async {
+  /// ✅ FIXED: This now returns the correct AttendanceResponse from your model file.
+  Future<AttendanceResponse?> getAttendance({DateTime? date}) async {
     try {
-      final response = await _dio.get("hostel/attendance");
+      String queryPath = "hostel/attendance";
+      if (date != null) {
+        String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+        queryPath += "?date=$formattedDate";
+      }
+
+      final response = await _dio.get(queryPath);
       if (response.statusCode == 200 && response.data != null) {
+        // Uses the .fromJson generated in attendance_response.dart
         return AttendanceResponse.fromJson(response.data);
       }
       return null;
@@ -177,6 +188,8 @@ class ApiService {
       return null;
     }
   }
+
+  Future<AttendanceResponse?> getHostelAttendance() => getAttendance();
 
   // ================= PARENT / GUARDIAN APIS =================
 
@@ -193,7 +206,6 @@ class ApiService {
     }
   }
 
-  // ✅ NEW INTEGRATED API: Parent Ward Leave History
   Future<ParentLeaveResponse?> getParentLeaveHistory() async {
     try {
       final response = await _dio.get("parent/ward/leave-history");
@@ -393,60 +405,8 @@ class ApiService {
   }
 }
 
-// --- ATTENDANCE MODELS (Kept intact) ---
+// ✅ IMPORTANT: I have removed the manually written AttendanceResponse, 
+// AttendanceSummary, and AttendanceData classes from here because 
+// they are now imported correctly from attendance_response.dart.
 
-class AttendanceResponse {
-  final bool success;
-  final int? hostelId;
-  final AttendanceSummary? summary;
-  final List<AttendanceData> data;
-
-  AttendanceResponse({required this.success, this.hostelId, this.summary, required this.data});
-
-  factory AttendanceResponse.fromJson(Map<String, dynamic> json) {
-    return AttendanceResponse(
-      success: json['success'] ?? false,
-      hostelId: json['hostel_id'],
-      summary: json['summary'] != null ? AttendanceSummary.fromJson(json['summary']) : null,
-      data: (json['data'] as List? ?? []).map((e) => AttendanceData.fromJson(e)).toList(),
-    );
-  }
-}
-
-class AttendanceSummary {
-  final int totalRecords;
-  final int present;
-  final int absent;
-
-  AttendanceSummary({required this.totalRecords, required this.present, required this.absent});
-
-  factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
-    return AttendanceSummary(
-      totalRecords: json['total_records'] ?? 0,
-      present: json['present'] ?? 0,
-      absent: json['absent'] ?? 0,
-    );
-  }
-}
-
-class AttendanceData {
-  final int id;
-  final String status;
-  final String firstName;
-  final String lastName;
-  final String studentCode;
-
-  AttendanceData({required this.id, required this.status, required this.firstName, required this.lastName, required this.studentCode});
-
-  factory AttendanceData.fromJson(Map<String, dynamic> json) {
-    return AttendanceData(
-      id: json['id'] ?? 0,
-      status: json['status'] ?? 'absent',
-      firstName: json['student_first_name'] ?? '',
-      lastName: json['student_last_name'] ?? '',
-      studentCode: json['student_code'] ?? '',
-    );
-  }
-}
- 
 final apiService = ApiService();

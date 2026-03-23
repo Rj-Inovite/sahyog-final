@@ -42,7 +42,8 @@ class AuthLocalStorage {
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-    return (token != null && token.isNotEmpty) ? token : null;
+    // Returns null if empty or missing
+    return (token != null && token.trim().isNotEmpty) ? token : null;
   }
 
   /// HELPER: Returns the full Authorization Header Map for Dio/HTTP calls.
@@ -76,12 +77,13 @@ class AuthLocalStorage {
   /// Decides whether to show Login or Dashboard on App Start.
   static Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    return token != null;
   }
 
   /// Quick check for role-based UI rendering.
   static Future<bool> isWarden() async {
     final role = (await getUserRole())?.toLowerCase();
+    // Supporting manager role as well for Sahyog hierarchy
     return role == 'warden' || role == 'manager';
   }
 

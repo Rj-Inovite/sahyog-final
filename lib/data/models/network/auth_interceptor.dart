@@ -3,11 +3,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 // --- STORAGE ---
-// Ensures the interceptor can pull the latest token from your local storage
+// Pulls the latest token from your centralized local storage
 import 'package:my_app/data/models/network/auth_local_storage.dart'; 
 
 /// This Interceptor automatically adds the Bearer Token to every outgoing request.
-/// It ensures the Web Panel and App stay synced by identifying the user via Token.
+/// It ensures all modules (Warden, Parent, Student) stay authenticated.
 class AuthInterceptor extends Interceptor {
   
   @override
@@ -20,7 +20,7 @@ class AuthInterceptor extends Interceptor {
       final String? token = await AuthLocalStorage.getToken();
 
       // 2. Standardize Headers for Laravel/PHP Backends
-      // Essential for 'guardian/leave/approve', 'warden', and 'parent/ward/leave-history'
+      // Required for all Sahyog endpoints like 'guardian/leave/approve'
       options.headers['Accept'] = 'application/json';
       options.headers['Content-Type'] = 'application/json';
 
@@ -28,9 +28,9 @@ class AuthInterceptor extends Interceptor {
       if (token != null && token.isNotEmpty) {
         // Ensuring the format is exactly "Bearer <token>"
         options.headers['Authorization'] = 'Bearer $token';
-        debugPrint("--- AUTH: Token injected for ${options.path} ---");
+        debugPrint("--- [API REQ]: ${options.method} ${options.path} (Token Injected) ---");
       } else {
-        debugPrint("--- AUTH: No Token Found for ${options.path} ---");
+        debugPrint("--- [API REQ]: ${options.method} ${options.path} (No Token Found) ---");
       }
     } catch (e) {
       debugPrint("--- AUTH_INTERCEPTOR_ERROR: $e ---");
@@ -42,9 +42,9 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    // Standard successful logging for debugging API flows
+    // Logging for successful API flows
     if (response.statusCode == 200 || response.statusCode == 201) {
-      debugPrint("--- API SUCCESS: [${response.requestOptions.path}] ---");
+      debugPrint("--- [API SUCCESS]: ${response.requestOptions.path} ---");
     }
     return handler.next(response);
   }
@@ -52,34 +52,34 @@ class AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // 5. Handle Token Expiry or Invalid Session (401 Unauthorized)
-    // If the token is rejected by the Sahyog server, we must clear local data.
+    // If the token is rejected, we must clear local data to prevent loop errors.
     if (err.response?.statusCode == 401) {
-      debugPrint("--- AUTH ERROR: 401 Unauthorized for ${err.requestOptions.path} ---");
+      debugPrint("--- [AUTH ERROR]: 401 Unauthorized at ${err.requestOptions.path} ---");
       
-      // Clear local storage so the app doesn't attempt to use an invalid session
+      // Clear local storage so the user is forced to log in again
       AuthLocalStorage.clearAuthData();
       
-      // Optional: Add logic here to redirect the user to the Login Screen
+      // Note: If you have a NavigationService, you can trigger a logout redirect here.
     }
 
     // 6. Specific Logging for Route Errors (404)
     if (err.response?.statusCode == 404) {
-      debugPrint("--- ROUTE ERROR: 404 Not Found at ${err.requestOptions.path} ---");
+      debugPrint("--- [ROUTE ERROR]: 404 Not Found at ${err.requestOptions.path} ---");
     }
 
-    // 7. Handle Connection Issues (Timeouts)
+    // 7. Handle Connection Issues (Timeouts/No Internet)
     if (err.type == DioExceptionType.connectionTimeout || 
         err.type == DioExceptionType.receiveTimeout ||
         err.type == DioExceptionType.connectionError) {
-      debugPrint("--- NETWORK ERROR: Connection issue on ${err.requestOptions.path}. ---");
+      debugPrint("--- [NETWORK ERROR]: Connection issue on ${err.requestOptions.path} ---");
     }
 
     // 8. Handle Specific Backend Errors (500)
     if (err.response?.statusCode == 500) {
-      debugPrint("--- SERVER ERROR: 500 Internal Server Error at ${err.requestOptions.path} ---");
+      debugPrint("--- [SERVER ERROR]: 500 Internal Error at ${err.requestOptions.path} ---");
     }
 
-    // Return the error to the calling Service so it can show a SnackBar or Error UI
+    // Return the error so the UI (like a SnackBar) can handle it
     return handler.next(err);
   }
 }
