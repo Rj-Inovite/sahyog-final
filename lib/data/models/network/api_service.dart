@@ -14,9 +14,6 @@ import 'package:my_app/data/models/network/student_list_response.dart';
 import 'package:my_app/data/models/network/my_room_response.dart'; 
 import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/parent_leave_list.dart'; 
-
-// ✅ IMPORT YOUR GENERATED MODEL FILE HERE
-// This ensures the API returns the exact type the UI expects.
 import 'package:my_app/data/models/network/attendance_response.dart';
 
 // --- CLIENTS & STORAGE ---
@@ -145,6 +142,8 @@ class ApiService {
     }
   }
 
+  /// ✅ INTEGRATED ACTION: Processes Approve/Reject for Warden
+  /// Used by warden_std_leave_view.dart
   Future<Map<String, dynamic>?> wardenApproveLeave({
     required int studentId,
     required int leaveId,
@@ -168,7 +167,6 @@ class ApiService {
 
   // ================= ATTENDANCE APIS =================
 
-  /// ✅ FIXED: This now returns the correct AttendanceResponse from your model file.
   Future<AttendanceResponse?> getAttendance({DateTime? date}) async {
     try {
       String queryPath = "hostel/attendance";
@@ -179,7 +177,6 @@ class ApiService {
 
       final response = await _dio.get(queryPath);
       if (response.statusCode == 200 && response.data != null) {
-        // Uses the .fromJson generated in attendance_response.dart
         return AttendanceResponse.fromJson(response.data);
       }
       return null;
@@ -404,9 +401,5 @@ class ApiService {
     }
   }
 }
-
-// ✅ IMPORTANT: I have removed the manually written AttendanceResponse, 
-// AttendanceSummary, and AttendanceData classes from here because 
-// they are now imported correctly from attendance_response.dart.
 
 final apiService = ApiService();

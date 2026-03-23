@@ -8,7 +8,8 @@ import 'register.dart';
 import 'warden-response.dart'; 
 import 'warden_profile.dart'; 
 import 'warden_std_leave_approve.dart'; 
-import 'warden_std_attendance_view.dart'; // NEW IMPORT
+import 'warden_std_attendance_view.dart';
+import 'warden_std_leave_view.dart'; // NEW MODULE IMPORT
 import 'data/models/network/api_service.dart'; 
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/warden_list_response.dart';
@@ -258,7 +259,8 @@ class _ConsoleHomeState extends State<ConsoleHome> {
       children: [
         _moduleCard(context, "Room Allotment", Icons.grid_view_rounded, const RoomInventoryPage(), "Manage Allotments"),
         _moduleCard(context, "Std Attendance", Icons.fact_check_rounded, const AttendancePage(), "Daily Attendance"),
-        _moduleCard(context, "Leave Records", Icons.time_to_leave_rounded, const WardenStdLeaveApprovePage(), "Approve Requests"),
+        _moduleCard(context, "Std Leaves", Icons.time_to_leave_rounded, const WardenStdLeaveView(), "Current Requests"), // MODIFIED
+        _moduleCard(context, "Leave Records", Icons.history_rounded, const WardenStdLeaveApprovePage(), "Approval Logs"),
         _moduleCard(context, "Staff", Icons.supervised_user_circle_rounded, const StaffManagementPage(), "Warden Directory"),
         _moduleCard(context, "Security Logs", Icons.security_rounded, const GateRecordsPage(), "Entry/Exit Log"),
       ],
@@ -483,7 +485,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
   }
 }
 
-// ================= OTHER MODULES (INVENTORY, COMPLAINTS, LOGS) =================
+// ================= OTHER MODULES =================
 
 class RoomInventoryPage extends StatelessWidget {
   const RoomInventoryPage({super.key});
@@ -511,6 +513,18 @@ class RoomInventoryPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class AttendancePage extends StatelessWidget {
+  const AttendancePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      appBar: AppBar(title: const Text("Daily Attendance"), backgroundColor: primaryIndigo, iconTheme: const IconThemeData(color: Colors.white)),
+      body: const Center(child: Text("Attendance Module Ready")),
     );
   }
 }

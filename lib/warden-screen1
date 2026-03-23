@@ -8,6 +8,7 @@ import 'register.dart';
 import 'warden-response.dart'; 
 import 'warden_profile.dart'; 
 import 'warden_std_leave_approve.dart'; 
+import 'warden_std_attendance_view.dart'; // NEW IMPORT
 import 'data/models/network/api_service.dart'; 
 import 'package:my_app/data/models/network/student_list_response.dart'; 
 import 'package:my_app/data/models/warden_list_response.dart';
@@ -389,108 +390,6 @@ class _StudentDirectoryPageState extends State<StudentDirectoryPage> {
           child: Text(student.status.toUpperCase(), 
               style: TextStyle(color: student.status.toLowerCase() == 'active' ? successGreen : Colors.grey, fontSize: 10, fontWeight: FontWeight.w900)),
         ),
-      ),
-    );
-  }
-}
-
-// ================= ATTENDANCE PAGE (API INTEGRATED) =================
-
-class AttendancePage extends StatefulWidget {
-  const AttendancePage({super.key});
-
-  @override
-  State<AttendancePage> createState() => _AttendancePageState();
-}
-
-class _AttendancePageState extends State<AttendancePage> {
-  bool _isLoading = true;
-  AttendanceResponse? _attendanceData;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchAttendance();
-  }
-
-  Future<void> _fetchAttendance() async {
-    setState(() => _isLoading = true);
-    final response = await apiService.getHostelAttendance();
-    if (mounted) {
-      setState(() {
-        _attendanceData = response;
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundWhite,
-      appBar: AppBar(
-        title: const Text("Daily Attendance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
-        backgroundColor: primaryIndigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _isLoading 
-      ? const Center(child: CircularProgressIndicator(color: primaryIndigo))
-      : Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(25),
-            decoration: BoxDecoration(
-              color: primaryIndigo.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text("Records Found", style: TextStyle(color: Colors.grey, fontSize: 12)), 
-                  Text("${_attendanceData?.summary?.totalRecords ?? 0} Students", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
-                ]),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  const Text("Present Count", style: TextStyle(color: Colors.grey, fontSize: 12)), 
-                  Text("${_attendanceData?.summary?.present ?? 0} Active", style: const TextStyle(color: successGreen, fontWeight: FontWeight.bold, fontSize: 16))
-                ]),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _attendanceData == null || _attendanceData!.data.isEmpty
-            ? const Center(child: Text("No records for today"))
-            : ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: _attendanceData!.data.length,
-                itemBuilder: (ctx, i) {
-                  final student = _attendanceData!.data[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white, 
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 4, offset: Offset(0, 2))],
-                    ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: student.status == 'present' ? successGreen.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                        child: Icon(Icons.person_rounded, color: student.status == 'present' ? successGreen : Colors.red)
-                      ),
-                      title: Text("${student.firstName} ${student.lastName}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(student.studentCode, style: const TextStyle(fontSize: 10)),
-                      trailing: Text(student.status.toUpperCase(), 
-                        style: TextStyle(color: student.status == 'present' ? successGreen : Colors.red, fontWeight: FontWeight.w900, fontSize: 10)),
-                    ),
-                  );
-                },
-              ),
-          ),
-        ],
       ),
     );
   }

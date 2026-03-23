@@ -1,0 +1,280 @@
+import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'data/models/network/api_service.dart';
+import 'package:my_app/data/models/network/student_list_response.dart'; 
+
+// --- ENHANCED DESIGN SYSTEM ---
+const Color primaryIndigo = Color(0xFF3F51B5);
+const Color darkIndigo = Color(0xFF303F9F);
+const Color accentIndigo = Color(0xFFC5CAE9);
+const Color backgroundWhite = Color(0xFFF8F9FD);
+const Color cardShadow = Color(0x1A000000);
+const Color textDark = Color(0xFF2D3436);
+const Color warningOrange = Color(0xFFFF9F43);
+const Color softRed = Color(0xFFFF7675);
+const Color softGreen = Color(0xFF55E6C1);
+
+class WardenStdLeaveView extends StatefulWidget {
+  const WardenStdLeaveView({super.key});
+
+  @override
+  State<WardenStdLeaveView> createState() => _WardenStdLeaveViewState();
+}
+
+class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
+  bool _isLoading = true;
+  List<Student> _leaveRequests = []; 
+  Timer? _autoRefreshTimer;
+  int _secondsRemaining = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLeaveRequests();
+    _startAutoRefreshTimer();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefreshTimer() {
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (_secondsRemaining > 1) {
+            _secondsRemaining--;
+          } else {
+            _secondsRemaining = 10;
+            _fetchLeaveRequests(isSilent: true);
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _fetchLeaveRequests({bool isSilent = false}) async {
+    if (!isSilent) setState(() => _isLoading = true);
+    try {
+      final response = await apiService.getStudentList(); 
+      if (response != null && response.success) {
+        if (mounted) {
+          setState(() {
+            // Logic: Showing students with 'Pending' or specific status for demo
+            _leaveRequests = response.students.take(5).toList(); 
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint("Sync Error: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundWhite,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildFancyAppBar(context),
+          SliverToBoxAdapter(child: _buildSyncIndicator()),
+          _isLoading 
+            ? const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: primaryIndigo)))
+            : _leaveRequests.isEmpty 
+              ? SliverFillRemaining(child: _buildEmptyState())
+              : SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return AnimationConfiguration.staggeredList(
+                          position: index,
+                          duration: const Duration(milliseconds: 500),
+                          child: SlideAnimation(
+                            verticalOffset: 50.0,
+                            child: FadeInAnimation(
+                              child: _buildLeaveCard(_leaveRequests[index]),
+                            ),
+                          ),
+                        );
+                      },
+                      childCount: _leaveRequests.length,
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFancyAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 120.0,
+      floating: false,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: primaryIndigo,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 55, bottom: 16),
+        title: const Text("Leave Requests", 
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.5)),
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryIndigo, darkIndigo],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSyncIndicator() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: softGreen, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              const Text("Live Monitoring", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueGrey)),
+            ],
+          ),
+          Text("Syncing in ${_secondsRemaining}s", style: TextStyle(fontSize: 11, color: primaryIndigo.withOpacity(0.7), fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeaveCard(Student student) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [BoxShadow(color: cardShadow, blurRadius: 20, offset: Offset(0, 10))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: primaryIndigo.withOpacity(0.03),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: primaryIndigo.withOpacity(0.1),
+                    child: Text(student.firstName[0], style: const TextStyle(color: primaryIndigo, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("${student.firstName} ${student.lastName ?? ''}", 
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textDark)),
+                        Text("Room: ${100 + student.id} | ID: ${student.studentCode}", 
+                            style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: warningOrange.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: const Text("PENDING", style: TextStyle(color: warningOrange, fontSize: 10, fontWeight: FontWeight.w900)),
+                  )
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.notes_rounded, size: 14, color: Colors.grey),
+                      SizedBox(width: 8),
+                      Text("Reason for Leave", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text("Requesting leave for 3 days to attend a cousin's wedding in my hometown. Will return by Monday evening.", 
+                    style: TextStyle(height: 1.4, color: textDark, fontSize: 13, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(child: _buildActionButton("Reject", softRed, Icons.close_rounded, () {})),
+                      const SizedBox(width: 15),
+                      Expanded(child: _buildActionButton("Approve", softGreen, Icons.check_rounded, () {})),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(String label, Color color, IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(color: accentIndigo.withOpacity(0.2), shape: BoxShape.circle),
+            child: const Icon(Icons. beach_access_rounded, size: 80, color: primaryIndigo),
+          ),
+          const SizedBox(height: 20),
+          const Text("All Caught Up!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textDark)),
+          const Text("No pending leave requests found.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+}

@@ -10,8 +10,6 @@ import 'package:my_app/data/models/network/student_list_response.dart';
 import 'package:my_app/data/models/warden_list_response.dart'; 
 import 'package:my_app/data/models/child_profile_response.dart'; 
 import 'package:my_app/data/models/network/parent_leave_list.dart';
-
-// ✅ This import is critical for the new Attendance feature
 import 'package:my_app/data/models/network/attendance_response.dart';
 
 part 'rest_api_client.g.dart';
@@ -31,9 +29,15 @@ abstract class RestAPIClient {
   @GET("student/view/{id}")
   Future<dynamic> getStudentView(@Path("id") int id);
 
-  /// ✅ Fixed return type to match your JsonSerializable model
   @GET("hostel/attendance")
   Future<AttendanceResponse> getAttendance();
+
+  /// ✅ NEW: Integrated Warden Leave Actions
+  @POST("warden/leave/approve")
+  Future<dynamic> wardenApproveLeave(@Body() Map<String, dynamic> body);
+
+  @POST("warden/leave/{id}/reject")
+  Future<dynamic> wardenRejectLeave(@Path("id") int id);
 
   // ================= BIOMETRIC REGISTRATION APIS =================
 

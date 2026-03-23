@@ -25,9 +25,9 @@ class AuthInterceptor extends Interceptor {
       options.headers['Content-Type'] = 'application/json';
 
       // 3. Inject Bearer Token if available
-      if (token != null && token.isNotEmpty) {
+      if (token != null && token.trim().isNotEmpty) {
         // Ensuring the format is exactly "Bearer <token>"
-        options.headers['Authorization'] = 'Bearer $token';
+        options.headers['Authorization'] = 'Bearer ${token.trim()}';
         debugPrint("--- [API REQ]: ${options.method} ${options.path} (Token Injected) ---");
       } else {
         debugPrint("--- [API REQ]: ${options.method} ${options.path} (No Token Found) ---");
@@ -50,16 +50,17 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
     // 5. Handle Token Expiry or Invalid Session (401 Unauthorized)
     // If the token is rejected, we must clear local data to prevent loop errors.
     if (err.response?.statusCode == 401) {
       debugPrint("--- [AUTH ERROR]: 401 Unauthorized at ${err.requestOptions.path} ---");
       
       // Clear local storage so the user is forced to log in again
-      AuthLocalStorage.clearAuthData();
+      await AuthLocalStorage.clearAuthData();
       
-      // Note: If you have a NavigationService, you can trigger a logout redirect here.
+      // OPTIONAL: If you have a global navigator key, you can navigate to login here:
+      // navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
     }
 
     // 6. Specific Logging for Route Errors (404)

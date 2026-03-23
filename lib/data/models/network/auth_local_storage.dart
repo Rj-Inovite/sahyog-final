@@ -43,7 +43,8 @@ class AuthLocalStorage {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
     // Returns null if empty or missing
-    return (token != null && token.trim().isNotEmpty) ? token : null;
+    if (token == null || token.trim().isEmpty) return null;
+    return token;
   }
 
   /// HELPER: Returns the full Authorization Header Map for Dio/HTTP calls.
@@ -81,15 +82,15 @@ class AuthLocalStorage {
   }
 
   /// Quick check for role-based UI rendering.
+  /// Normalized to handle ' Warden ' or 'WARDEN' strings safely.
   static Future<bool> isWarden() async {
-    final role = (await getUserRole())?.toLowerCase();
-    // Supporting manager role as well for Sahyog hierarchy
+    final role = (await getUserRole())?.toLowerCase().trim();
     return role == 'warden' || role == 'manager';
   }
 
   /// Specific check for Parent role (Useful for your current Parent View integration)
   static Future<bool> isParent() async {
-    final role = (await getUserRole())?.toLowerCase();
+    final role = (await getUserRole())?.toLowerCase().trim();
     return role == 'parent' || role == 'guardian';
   }
 
