@@ -1,20 +1,26 @@
 class ChildProfileResponse {
   final bool success;
-  final ChildData? data;
+  final List<ChildData>? data; // CHANGED: Now handles a List as seen in your API response
+  final String? message;
 
-  ChildProfileResponse({required this.success, this.data});
+  ChildProfileResponse({required this.success, this.data, this.message});
 
   factory ChildProfileResponse.fromJson(Map<String, dynamic> json) {
     return ChildProfileResponse(
-      success: json['success'] ?? false,
-      data: json['data'] != null ? ChildData.fromJson(json['data']) : null,
+      // Handles both bool (true/false) and string ("success") statuses
+      success: json['success'] == true || json['status'] == 'success', 
+      message: json['message']?.toString(),
+      // Check if 'data' exists and is a List []
+      data: (json['data'] != null && json['data'] is List)
+          ? (json['data'] as List).map((i) => ChildData.fromJson(i)).toList()
+          : null,
     );
   }
 }
 
 class ChildData {
   final String fullName;
-  final String studentId; // This is the 'student_code' from your API
+  final String studentId;
   final String email;
   final String mobile;
   final AcademicDetails? academicDetails;
@@ -31,17 +37,21 @@ class ChildData {
 
   factory ChildData.fromJson(Map<String, dynamic> json) {
     return ChildData(
-      fullName: json['full_name'] ?? 'N/A',
-      // ✅ FIXED: Using 'student_code' to match your Postman response
-      // Adding a fallback to 'student_id' ensures other APIs don't break.
-      studentId: (json['student_code'] ?? json['student_id'] ?? '0').toString(),
-      email: json['email'] ?? 'N/A',
-      mobile: json['mobile'] ?? 'N/A',
-      academicDetails: json['academic_details'] != null 
-          ? AcademicDetails.fromJson(json['academic_details']) 
+      // Flexible mapping for 'full_name' or 'name'
+      fullName: json['full_name']?.toString() ?? json['name']?.toString() ?? 'No Name Provided',
+      
+      // Safety for studentId: checks multiple possible keys and converts to String
+      studentId: (json['student_id'] ?? json['student_code'] ?? json['id'] ?? '0').toString(),
+      
+      email: json['email']?.toString() ?? 'N/A',
+      mobile: json['mobile']?.toString() ?? 'N/A',
+      
+      academicDetails: (json['academic_details'] != null && json['academic_details'] is Map)
+          ? AcademicDetails.fromJson(json['academic_details'])
           : null,
-      hostelInfo: json['hostel_info'] != null 
-          ? HostelInfo.fromJson(json['hostel_info']) 
+          
+      hostelInfo: (json['hostel_info'] != null && json['hostel_info'] is Map)
+          ? HostelInfo.fromJson(json['hostel_info'])
           : null,
     );
   }
@@ -56,15 +66,15 @@ class AcademicDetails {
 
   factory AcademicDetails.fromJson(Map<String, dynamic> json) {
     return AcademicDetails(
-      institute: json['institute'],
-      course: json['course'],
-      admissionDate: json['admission_date'],
+      institute: json['institute']?.toString(),
+      course: json['course']?.toString(),
+      admissionDate: json['admission_date']?.toString(),
     );
   }
 
-  /// Helper to convert ISO date string into readable DD/MM/YYYY
+  // Helper to display formatted date in UI
   String get formattedDate {
-    if (admissionDate == null) return "N/A";
+    if (admissionDate == null || admissionDate!.isEmpty) return "N/A";
     try {
       DateTime dt = DateTime.parse(admissionDate!);
       return "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
@@ -82,12 +92,13 @@ class HostelInfo {
 
   factory HostelInfo.fromJson(Map<String, dynamic> json) {
     return HostelInfo(
-      hostelId: json['hostel_id'] ?? 0,
-      status: json['status'] ?? 'Inactive',
+      // Safely parses hostel_id even if it comes as a String
+      hostelId: int.tryParse(json['hostel_id']?.toString() ?? '0') ?? 0,
+      status: json['status']?.toString() ?? 'inactive',
     );
   }
 
-  /// Helper for UI display
+  // Capitalizes status for better UI display (e.g., "Active")
   String get displayStatus {
     if (status.isEmpty) return "Unknown";
     return status[0].toUpperCase() + status.substring(1).toLowerCase();

@@ -20,6 +20,7 @@ import 'package:my_app/data/models/network/attendance_response.dart';
 import 'rest_api_client.dart';
 
 /// --- AUTH INTERCEPTOR ---
+/// Automatically attaches the Bearer Token to every outgoing request.
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -48,6 +49,7 @@ class AuthInterceptor extends Interceptor {
 }
 
 /// --- MAIN API SERVICE ---
+/// Central hub for all network communication in the Sahyog App.
 class ApiService {
   late final RestAPIClient client;
   late final Dio _dio;
@@ -60,6 +62,7 @@ class ApiService {
       validateStatus: (status) => status != null && status < 500,
     ));
 
+    // Adding Interceptors for Auth and Logging
     _dio.interceptors.add(AuthInterceptor());
     _dio.interceptors.add(LogInterceptor(
       requestBody: true, 
@@ -142,8 +145,6 @@ class ApiService {
     }
   }
 
-  /// ✅ INTEGRATED ACTION: Processes Approve/Reject for Warden
-  /// Used by warden_std_leave_view.dart
   Future<Map<String, dynamic>?> wardenApproveLeave({
     required int studentId,
     required int leaveId,
@@ -190,32 +191,41 @@ class ApiService {
 
   // ================= PARENT / GUARDIAN APIS =================
 
+  /// Fetches the child's profile details for the Parent Dashboard.
   Future<ChildProfileResponse?> getChildProfile() async {
     try {
       final response = await _dio.get("parent/child-profile");
-      if (response.statusCode == 200 && response.data != null) {
+      if (response.data != null && response.data is Map<String, dynamic>) {
         return ChildProfileResponse.fromJson(response.data);
       }
       return null;
     } on DioException catch (e) {
       _handleDioError("Child Profile", e);
       return null;
+    } catch (e) {
+      debugPrint("Unexpected Error in getChildProfile: $e");
+      return null;
     }
   }
 
+  /// Fetches the leave history of the parent's ward.
   Future<ParentLeaveResponse?> getParentLeaveHistory() async {
     try {
       final response = await _dio.get("parent/ward/leave-history");
-      if (response.statusCode == 200 && response.data != null) {
+      if (response.data != null && response.data is Map<String, dynamic>) {
         return ParentLeaveResponse.fromJson(response.data);
       }
       return null;
     } on DioException catch (e) {
       _handleDioError("Parent Leave History", e);
       return null;
+    } catch (e) {
+      debugPrint("Unexpected Error in getParentLeaveHistory: $e");
+      return null;
     }
   }
 
+  /// Multi-endpoint fallback for fetching leaves (Maintains compatibility with older logic).
   Future<List<dynamic>> getLeaves([int? userId]) async {
     List<String> endpoints = ["guardian/leaves/pending", "guardian/leaves", "parent/leaves", "leaves"];
     for (String path in endpoints) {
@@ -233,10 +243,11 @@ class ApiService {
     return [];
   }
 
+  /// Parent Action: Approve a ward's leave request.
   Future<dynamic> parentApproveLeave({required int studentId, required int leaveId}) async {
     try {
       final response = await _dio.post(
-        "guardian/leave/approve", 
+        "parent/leave/approve", 
         data: {"student_id": studentId, "leave_id": leaveId},
       );
       return response.data;
@@ -246,9 +257,10 @@ class ApiService {
     }
   }
 
+  /// Parent Action: Reject a ward's leave request.
   Future<dynamic> parentRejectLeave(int leaveId) async {
     try {
-      final response = await _dio.post("guardian/leave/$leaveId/reject");
+      final response = await _dio.post("parent/leave/$leaveId/reject");
       return response.data;
     } on DioException catch (e) {
       _handleDioError("Parent Leave Rejection", e);

@@ -20,20 +20,22 @@ class AuthLocalStorage {
     String? name,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    
+    // Safety: Trim token to ensure no leading/trailing spaces cause 401 errors
+    await prefs.setString(_tokenKey, token.trim());
     
     // Safety: Convert ID to string before saving to SharedPreferences
     if (id != null) {
-      await prefs.setString(_userIdKey, id.toString());
+      await prefs.setString(_userIdKey, id.toString().trim());
     }
     
-    if (role != null) await prefs.setString(_userRoleKey, role);
-    if (name != null) await prefs.setString(_userNameKey, name);
+    if (role != null) await prefs.setString(_userRoleKey, role.trim());
+    if (name != null) await prefs.setString(_userNameKey, name.trim());
   }
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    await prefs.setString(_tokenKey, token.trim());
   }
 
   // ================= GETTER METHODS =================
@@ -48,6 +50,7 @@ class AuthLocalStorage {
   }
 
   /// HELPER: Returns the full Authorization Header Map for Dio/HTTP calls.
+  /// This is used by your ApiService to authenticate requests.
   static Future<Map<String, String>> getAuthHeader() async {
     final token = await getToken();
     return {
