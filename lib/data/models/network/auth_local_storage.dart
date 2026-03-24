@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Centralized local storage for Sahyog authentication.
+/// Handles token management and role-based checks for Warden, Parent, and Student modules.
 class AuthLocalStorage {
   // --- STORAGE KEYS ---
   static const String _tokenKey = 'auth_token';
@@ -33,6 +34,7 @@ class AuthLocalStorage {
     if (name != null) await prefs.setString(_userNameKey, name.trim());
   }
 
+  /// Updates just the token if needed (e.g., during a token refresh)
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token.trim());
@@ -50,7 +52,7 @@ class AuthLocalStorage {
   }
 
   /// HELPER: Returns the full Authorization Header Map for Dio/HTTP calls.
-  /// This is used by your ApiService to authenticate requests.
+  /// This is used by your AuthInterceptor to authenticate requests automatically.
   static Future<Map<String, String>> getAuthHeader() async {
     final token = await getToken();
     return {

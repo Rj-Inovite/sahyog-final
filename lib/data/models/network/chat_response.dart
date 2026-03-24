@@ -12,6 +12,7 @@ class ChatResponse {
   ChatResponse({this.success, this.message, this.chatDetails});
 
   factory ChatResponse.fromJson(Map<String, dynamic> json) => _$ChatResponseFromJson(json);
+  
   Map<String, dynamic> toJson() => _$ChatResponseToJson(this);
 }
 
@@ -25,9 +26,18 @@ class ChatDetails {
   final ChatUser? from;
   final ChatUser? to;
 
-  ChatDetails({this.conversationId, this.messageId, this.content, this.from, this.to});
+  ChatDetails({
+    this.conversationId, 
+    this.messageId, 
+    this.content, 
+    this.from, 
+    this.to,
+  });
 
   factory ChatDetails.fromJson(Map<String, dynamic> json) => _$ChatDetailsFromJson(json);
+
+  // Added toJson to support nested serialization
+  Map<String, dynamic> toJson() => _$ChatDetailsToJson(this);
 }
 
 @JsonSerializable()
@@ -38,4 +48,7 @@ class ChatUser {
   ChatUser({this.id, this.name});
 
   factory ChatUser.fromJson(Map<String, dynamic> json) => _$ChatUserFromJson(json);
+
+  // Added toJson to support nested serialization
+  Map<String, dynamic> toJson() => _$ChatUserToJson(this);
 }

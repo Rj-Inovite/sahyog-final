@@ -11,6 +11,8 @@ import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/child_profile_response.dart'; 
 import 'package:my_app/data/models/network/parent_leave_list.dart';
 import 'package:my_app/data/models/network/attendance_response.dart';
+// ✅ Corrected import for your new chat response model
+import 'package:my_app/data/models/network/chat_response.dart'; 
 
 part 'rest_api_client.g.dart';
 
@@ -32,7 +34,7 @@ abstract class RestAPIClient {
   @GET("hostel/attendance")
   Future<AttendanceResponse> getAttendance();
 
-  /// ✅ NEW: Integrated Warden Leave Actions
+  /// ✅ Integrated Warden Leave Actions
   @POST("warden/leave/approve")
   Future<dynamic> wardenApproveLeave(@Body() Map<String, dynamic> body);
 
@@ -97,8 +99,10 @@ abstract class RestAPIClient {
   @POST("chat/setup")
   Future<dynamic> setupConversation(@Body() Map<String, dynamic> body);
 
+  /// ✅ Warden Chat Send API
+  /// Uses the new ChatResponse model for proper typed data handling
   @POST("chat/send")
-  Future<dynamic> sendWardenMessage(@Body() Map<String, dynamic> body);
+  Future<ChatResponse> sendWardenMessage(@Body() Map<String, dynamic> body);
 
   @GET("chat/messages/{id}")
   Future<dynamic> getChatHistory(@Path("id") int id);

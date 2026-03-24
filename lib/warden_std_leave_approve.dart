@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/data/models/network/api_service.dart';
 
-import 'package:my_app/data/models/network/auth_local_storage.dart';  
-
 // --- DESIGN SYSTEM ---
 const Color primaryIndigo = Color(0xFF3F51B5);
 const Color backgroundWhite = Color(0xFFFFFFFF);
@@ -30,21 +28,19 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     _fetchLeaves();
   }
 
-  /// ✅ Fetches leaves and handles potential data format variations
+  /// ✅ Fetches leaves using the correct service method
   Future<void> _fetchLeaves() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     
     try {
-      final response = await apiService.getWardenLeaves(); 
+      // Calling the method we fixed in api_service.dart
+      final response = await apiService.getWardenLeaveRequests(); 
       
       if (mounted) {
         setState(() {
-          // Robust check for list vs map response
-          if (response is List) {
-            _allLeaves = response;
-          } else if (response is Map && response['data'] != null) {
-            _allLeaves = response['data'];
+          if (response != null && response['success'] == true) {
+            _allLeaves = response['data'] ?? [];
           }
           _isLoading = false;
         });
@@ -55,7 +51,7 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     }
   }
 
-  /// ✅ FIXED: Handles the Approval/Rejection with Explicit Int Parsing
+  /// ✅ FIXED: Matches the ApiService method signature
   Future<void> _handleAction(dynamic leave, bool approve) async {
     showDialog(
       context: context,
@@ -64,32 +60,33 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     );
 
     try {
-      // --- THE FIX ---
-      // We use int.tryParse or .toInt() to ensure we pass an integer to the ApiService
-      final int studentId = int.tryParse(leave['user_id'].toString()) ?? 0;
+      // Parse the ID safely
       final int leaveId = int.tryParse(leave['id'].toString()) ?? 0;
 
-      if (studentId == 0 || leaveId == 0) {
-        throw Exception("Invalid ID format detected");
+      if (leaveId == 0) {
+        throw Exception("Invalid Leave ID");
       }
 
-      final response = await apiService.wardenApproveLeave(
-        studentId: studentId,
-        leaveId: leaveId,
-        isApprove: approve,
-      );
+      bool success = false;
+
+      // Use the specific method based on the action
+      if (approve) {
+        success = await apiService.wardenApproveLeave(leaveId);
+      } else {
+        success = await apiService.wardenRejectLeave(leaveId);
+      }
 
       if (!mounted) return;
       Navigator.pop(context); // Close loader
 
-      if (response != null && (response['success'] == true || response['status'] == 'success')) {
+      if (success) {
         _showSnackBar(
           "Leave ${approve ? 'Approved' : 'Rejected'} Successfully", 
           approve ? successGreen : Colors.redAccent
         );
-        _fetchLeaves(); // Refresh the list to reflect changes
+        _fetchLeaves(); // Refresh the list
       } else {
-        _showSnackBar(response?['message'] ?? "Action failed", Colors.orange);
+        _showSnackBar("Failed to process request. Please try again.", Colors.orange);
       }
     } catch (e) {
       if (mounted) {
@@ -153,9 +150,9 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     final filteredList = _allLeaves.where((l) {
       final status = l['status'].toString().toLowerCase();
       if (filterStatus == "pending") {
-        return status == "pending" || status == "waiting";
+        return status == "pending" || status == "waiting" || status == "parent_approved";
       } else {
-        return status == "approved" || status == "rejected";
+        return status == "approved" || status == "rejected" || status == "manager_approved";
       }
     }).toList();
 
@@ -186,6 +183,10 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
   }
 
   Widget _buildLeaveCard(dynamic leave, bool isPending) {
+    // Handling nested student object if present, otherwise using top-level keys
+    final studentName = leave['student_name'] ?? (leave['student'] != null ? leave['student']['name'] : "Student");
+    final studentId = leave['user_id'] ?? (leave['student'] != null ? leave['student']['id'] : "N/A");
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
@@ -218,10 +219,10 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(leave['student_name'] ?? "Student", 
+                                  Text(studentName.toString(), 
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: textDark)),
-                                  Text("Student ID: ${leave['user_id']}", 
+                                  Text("ID: $studentId", 
                                     style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                 ],
                               ),
@@ -234,7 +235,7 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                   ),
                   const Divider(height: 25),
                   _infoRow(Icons.calendar_month_rounded, "Dates", 
-                      "${leave['start_date'].toString().split(' ')[0]} - ${leave['end_date'].toString().split(' ')[0]}"),
+                      "${leave['start_date'].toString().split(' ')[0]} to ${leave['end_date'].toString().split(' ')[0]}"),
                   const SizedBox(height: 8),
                   _infoRow(Icons.info_outline_rounded, "Reason", leave['reason'] ?? "N/A"),
                 ],
@@ -246,7 +247,7 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                   Expanded(
                     child: _actionButton("REJECT", Colors.redAccent, () => _handleAction(leave, false)),
                   ),
-                  const SizedBox(width: 1), // Thin separator
+                  const SizedBox(width: 1), 
                   Expanded(
                     child: _actionButton("APPROVE", successGreen, () => _handleAction(leave, true)),
                   ),
@@ -286,8 +287,8 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
   }
 
   Widget _statusChip(String label) {
-    bool isPending = label == "PENDING" || label == "WAITING";
-    bool isApproved = label == "APPROVED";
+    bool isPending = label == "PENDING" || label == "WAITING" || label == "PARENT_APPROVED";
+    bool isApproved = label == "APPROVED" || label == "MANAGER_APPROVED";
     Color chipColor = isPending ? Colors.orange : (isApproved ? successGreen : Colors.redAccent);
 
     return Container(
@@ -296,7 +297,7 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
         color: chipColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Text(label, style: TextStyle(color: chipColor, fontSize: 9, fontWeight: FontWeight.w900)),
+      child: Text(label.replaceAll('_', ' '), style: TextStyle(color: chipColor, fontSize: 9, fontWeight: FontWeight.w900)),
     );
   }
 }

@@ -1,15 +1,17 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:my_app/data/models/network/api_service.dart';
 
 // Internal imports
-import 'package:my_app/data/models/network/api_service.dart';
+ // Ensure correct path
 import 'package:my_app/data/models/network/auth_local_storage.dart';
+import 'package:my_app/data/models/network/chat_response.dart';
 
 class WardenChatScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -33,7 +35,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   // --- SAHYOG PREMIUM THEME ---
   final Color primaryLavender = const Color.fromRGBO(207, 16, 134, 1);
   final Color bgLavender = const Color(0xFFF3F2F7);
-  final Color bubbleMe = const Color(0xFFDCF8C6); // WhatsApp Green style
+  final Color bubbleMe = const Color(0xFFDCF8C6); 
   final Color bubbleThem = Colors.white;
 
   @override
@@ -54,14 +56,19 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
 
   Future<void> _initializeChatSession() async {
     try {
-      // 1. Get Profile via Token to know who "Me" is dynamically
+      // 1. Get Profile via Token to identify 'Me'
       final profile = await apiService.getProfile();
       if (profile != null) {
-        _myIdFromToken = profile['data']['id'].toString();
+        // Handle both Map and typed Profile if you've updated it
+        _myIdFromToken = (profile is Map) 
+            ? profile['data']['id'].toString() 
+            : profile.id.toString();
       }
 
       // 2. Setup Conversation Room
+      // Passing the student/user ID from the provided userData
       final response = await apiService.setupChat();
+      
       if (response != null && response['success'] == true) {
         setState(() {
           _activeConversationId = response['conversation_id'];
@@ -99,7 +106,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
                 "id": msg['id'],
                 "text": msg['message'] ?? "",
                 "isMe": msg['sender_id'].toString() == _myIdFromToken,
-                "status": msg['status'] ?? "sent", // sent, delivered, seen
+                "status": msg['status'] ?? "sent", 
                 "time": msg['created_at'] != null 
                     ? DateFormat('hh:mm a').format(DateTime.parse(msg['created_at'])) 
                     : "--:--"
@@ -110,7 +117,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
         }
       }
     } catch (e) {
-      debugPrint("Sync error ignored (likely 404/Empty)");
+      debugPrint("Sync error: $e");
     }
   }
 
@@ -118,14 +125,20 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
 
+    // Use recipient ID from the userData map passed to this screen
+    final recipientId = widget.userData['id'];
+    if (recipientId == null) return;
+
     setState(() => _isSending = true);
     _messageController.clear();
 
     try {
-      final response = await apiService.sendMessage(_activeConversationId!, text);
-      if (response != null) {
+      // ✅ Using the updated typed API call
+      final ChatResponse? response = await apiService.sendMessage(recipientId, text);
+      
+      if (response != null && response.success == true) {
         await _refreshChat();
-        HapticFeedback.lightImpact(); // Vibration feel
+        HapticFeedback.lightImpact();
       }
     } catch (e) {
       debugPrint("Send Error: $e");
@@ -137,29 +150,33 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   // ================== ADVANCED ACTIONS (Delete/Edit) ==================
 
   void _showOptions(Map<String, dynamic> msg) {
-    if (!msg['isMe']) return; // Only edit/delete own messages
+    if (!msg['isMe']) return; 
     
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 10),
           ListTile(
             leading: const Icon(Icons.edit, color: Colors.blue),
             title: const Text("Edit Message"),
             onTap: () {
               Navigator.pop(context);
-              _messageController.text = msg['text']; // Load text back to input
+              _messageController.text = msg['text'];
             },
           ),
           ListTile(
             leading: const Icon(Icons.delete, color: Colors.red),
             title: const Text("Delete for everyone"),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              // Call your delete API here if available
+              await apiService.deleteMessage(msg['id']);
+              _refreshChat();
             },
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -168,7 +185,11 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -184,7 +205,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"),
-            opacity: 0.06, // Classic WhatsApp Wallpaper pattern
+            opacity: 0.06, 
             fit: BoxFit.cover,
           ),
         ),
@@ -198,6 +219,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
                     padding: const EdgeInsets.all(12),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) => FadeInUp(
+                      from: 10,
                       duration: const Duration(milliseconds: 300),
                       child: _buildChatBubble(_messages[index]),
                     ),
@@ -213,15 +235,23 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: primaryLavender,
-      title: const Row(
+      elevation: 2,
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: Row(
         children: [
-          CircleAvatar(backgroundImage: NetworkImage("https://cdn-icons-png.flaticon.com/512/3135/3135715.png")),
-          SizedBox(width: 10),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            child: Icon(Icons.person, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Sahyog Web Sync", style: TextStyle(fontSize: 16, color: Colors.white)),
-              Text("Online", style: TextStyle(fontSize: 11, color: Colors.white70)),
+              Text(
+                widget.userData['name'] ?? "Student Chat", 
+                style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)
+              ),
+              const Text("Online", style: TextStyle(fontSize: 11, color: Colors.white70)),
             ],
           )
         ],
@@ -237,6 +267,7 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: isMe ? bubbleMe : bubbleThem,
@@ -246,13 +277,16 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
               bottomLeft: Radius.circular(isMe ? 12 : 0),
               bottomRight: Radius.circular(isMe ? 0 : 12),
             ),
-            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
+            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(msg['text'], style: const TextStyle(fontSize: 15, color: Colors.black87)),
-              const SizedBox(height: 2),
+              Text(
+                msg['text'], 
+                style: const TextStyle(fontSize: 15, color: Colors.black87)
+              ),
+              const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -276,32 +310,43 @@ class _WardenChatScreenState extends State<WardenChatScreen> {
   Widget _buildInputPanel() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))]
+      ),
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(icon: Icon(Icons.add, color: primaryLavender), onPressed: () {}), // Share files
+            IconButton(
+              icon: Icon(Icons.add, color: primaryLavender), 
+              onPressed: () {
+                // Future: Implement Image/File Picker here
+              }
+            ),
             Expanded(
               child: TextField(
                 controller: _messageController,
-                maxLines: null,
+                maxLines: 4,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: "Message",
+                  hintText: "Type a message...",
                   filled: true,
                   fillColor: bgLavender,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
                 ),
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 8),
             _isSending 
-              ? const SizedBox(width: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
-              : CircleAvatar(
-                  backgroundColor: primaryLavender,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: _handleSend,
+              ? SizedBox(width: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: primaryLavender)))
+              : GestureDetector(
+                  onTap: _handleSend,
+                  child: CircleAvatar(
+                    backgroundColor: primaryLavender,
+                    radius: 22,
+                    child: const Icon(Icons.send, color: Colors.white, size: 20),
                   ),
                 ),
           ],
