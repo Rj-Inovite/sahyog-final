@@ -16,11 +16,14 @@ import 'package:my_app/data/models/network/leave_response.dart';
 import 'package:my_app/data/models/network/parent_leave_list.dart'; 
 import 'package:my_app/data/models/network/attendance_response.dart';
 import 'package:my_app/data/models/network/chat_response.dart'; 
+// Integrated Warden Response Model for type safety
+import 'package:my_app/data/models/network/warden_leave_response.dart';
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
 
 /// --- AUTH INTERCEPTOR ---
+/// Handles Bearer Token injection and 401 Session Expiration
 class AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -50,6 +53,7 @@ class AuthInterceptor extends Interceptor {
 }
 
 /// --- MAIN API SERVICE ---
+/// Core service managing all Network communication for Sahyog App
 class ApiService {
   late final RestAPIClient client;
   late final Dio _dio;
@@ -116,53 +120,65 @@ class ApiService {
     }
   }
 
-  /// ✅ Fixed: Renamed to match UI expectations and improved logic
-  Future<Map<String, dynamic>?> getWardenLeaveRequests() async {
+  /// ✅ ELABORATED: Get Warden Leave Requests with proper model mapping
+  Future<WardenLeaveResponse?> getWardenLeaveRequests() async {
     try {
-      final response = await _dio.get("warden/leaves/pending");
+      // First try standard warden endpoint, then manager fallback
+      final response = await _dio.get("warden/leaves");
       if (response.statusCode == 200 && response.data != null) {
-        // Ensuring it returns a Map with a 'success' key for your UI logic
-        if (response.data is Map<String, dynamic>) {
-          return response.data;
-        } else if (response.data is List) {
-          return {"success": true, "data": response.data};
-        }
+        return WardenLeaveResponse.fromJson(response.data);
       }
-      return {"success": false, "data": []};
+      
+      // Fallback for Manager roles
+      final responseFallback = await _dio.get("manager/leaves");
+      if (responseFallback.statusCode == 200 && responseFallback.data != null) {
+        return WardenLeaveResponse.fromJson(responseFallback.data);
+      }
+      
+      return null;
     } catch (e) {
       debugPrint("Warden Leave Requests Error: $e");
-      return {"success": false, "data": []};
+      return null;
     }
   }
 
-  /// ✅ Fixed: Updated signature to match the call in your View
-  /// Returns bool to satisfy the 'bool success = await ...' logic in UI
-  Future<bool> wardenApproveLeave(int leaveId) async {
+  /// ✅ FULLY INTEGRATED: Action for Warden Approval
+  Future<bool> wardenApproveLeave(int studentId, int leaveId) async {
     try {
-      // Adjusted endpoint and data payload to match common Sahyog logic
       final response = await _dio.post(
         "warden/leave/approve",
-        data: {"leave_id": leaveId},
+        data: {"student_id": studentId, "leave_id": leaveId},
       );
       
-      if (response.statusCode == 200 || response.data['success'] == true) {
-        return true;
+      // If warden endpoint doesn't exist, try manager endpoint
+      if (response.statusCode == 404) {
+        final managerResponse = await _dio.post(
+          "manager/leave/approve",
+          data: {"student_id": studentId, "leave_id": leaveId},
+        );
+        return (managerResponse.statusCode == 200 && managerResponse.data['success'] == true);
       }
-      return false;
-    } on DioException catch (e) {
-      _handleDioError("Warden Leave Approval", e);
-      return false;
+      
+      return (response.statusCode == 200 && response.data['success'] == true);
     } catch (e) {
+      _handleDioError("Warden Approve", e as DioException);
       return false;
     }
   }
 
-  // Existing Rejection logic preserved for Warden
+  /// ✅ FULLY INTEGRATED: Action for Warden Rejection
   Future<bool> wardenRejectLeave(int leaveId) async {
     try {
       final response = await _dio.post("warden/leave/$leaveId/reject");
-      return (response.statusCode == 200 || response.data['success'] == true);
+      
+      if (response.statusCode == 404) {
+        final managerResponse = await _dio.post("manager/leave/$leaveId/reject");
+        return (managerResponse.statusCode == 200 && managerResponse.data['success'] == true);
+      }
+      
+      return (response.statusCode == 200 && response.data['success'] == true);
     } catch (e) {
+      _handleDioError("Warden Reject", e as DioException);
       return false;
     }
   }
@@ -195,15 +211,12 @@ class ApiService {
   Future<ChildProfileResponse?> getChildProfile() async {
     try {
       final response = await _dio.get("parent/child-profile");
-      if (response.data != null && response.data is Map<String, dynamic>) {
+      if (response.statusCode == 200 && response.data != null) {
         return ChildProfileResponse.fromJson(response.data);
       }
       return null;
     } on DioException catch (e) {
       _handleDioError("Child Profile", e);
-      return null;
-    } catch (e) {
-      debugPrint("Unexpected Error in getChildProfile: $e");
       return null;
     }
   }
@@ -211,15 +224,12 @@ class ApiService {
   Future<ParentLeaveResponse?> getParentLeaveHistory() async {
     try {
       final response = await _dio.get("parent/ward/leave-history");
-      if (response.data != null && response.data is Map<String, dynamic>) {
+      if (response.statusCode == 200 && response.data != null) {
         return ParentLeaveResponse.fromJson(response.data);
       }
       return null;
     } on DioException catch (e) {
       _handleDioError("Parent Leave History", e);
-      return null;
-    } catch (e) {
-      debugPrint("Unexpected Error in getParentLeaveHistory: $e");
       return null;
     }
   }
@@ -244,7 +254,7 @@ class ApiService {
   Future<dynamic> parentApproveLeave({required int studentId, required int leaveId}) async {
     try {
       final response = await _dio.post(
-        "parent/leave/approve", 
+        "guardian/leave/approve", 
         data: {"student_id": studentId, "leave_id": leaveId},
       );
       return response.data;
@@ -256,7 +266,7 @@ class ApiService {
 
   Future<dynamic> parentRejectLeave(int leaveId) async {
     try {
-      final response = await _dio.post("parent/leave/$leaveId/reject");
+      final response = await _dio.post("guardian/leave/$leaveId/reject");
       return response.data;
     } on DioException catch (e) {
       _handleDioError("Parent Leave Rejection", e);
@@ -353,17 +363,13 @@ class ApiService {
     }
   }
   
-  Future<ChatResponse?> sendMessage(int recipientId, String content) async {
+  Future<dynamic> sendMessage(int conversationId, String message) async {
     try {
-      final payload = {
-        "recipient_id": recipientId, 
-        "type": "text", 
-        "content": content
-      };
+      final payload = {"conversation_id": conversationId, "message": message};
       return await client.sendWardenMessage(payload);
     } catch (e) {
       debugPrint("Send Message Error: $e");
-      return null;
+      rethrow;
     }
   }
       
@@ -391,21 +397,12 @@ class ApiService {
   Future<dynamic> uploadChatFile(int conversationId, File file) async {
     try {
       String fileName = file.path.split('/').last;
-      String extension = fileName.split('.').last.toLowerCase();
-      String type = (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) ? "image" : "file";
-
       FormData formData = FormData.fromMap({
         "conversation_id": conversationId,
-        "type": type,
         "file": await MultipartFile.fromFile(file.path, filename: fileName),
       });
-
-      final response = await _dio.post("chat/upload", data: formData);
-      return response.data;
-    } catch (e) { 
-      debugPrint("Chat File Upload Error: $e");
-      return null; 
-    }
+      return await _dio.post("chat/upload", data: formData);
+    } catch (e) { return null; }
   }
 
   // ================= UTILITIES & SHARED =================

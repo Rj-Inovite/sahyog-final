@@ -1,10 +1,11 @@
 // ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:my_app/data/models/network/api_service.dart';
+import 'package:my_app/data/models/network/warden_leave_response.dart';
 
 // --- DESIGN SYSTEM ---
-const Color primaryIndigo = Color(0xFF3F51B5);
-const Color backgroundWhite = Color(0xFFFFFFFF);
+const Color primaryIndigo = Color(0xFF1A237E);
+const Color backgroundWhite = Color(0xFFF8F9FD);
 const Color textDark = Color(0xFF2D3436);
 const Color successGreen = Color(0xFF00B894);
 const Color cardShadow = Color(0x0F000000);
@@ -18,7 +19,8 @@ class WardenStdLeaveApprovePage extends StatefulWidget {
 
 class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<dynamic> _allLeaves = [];
+  // ✅ Changed to use the typed model for better data handling
+  List<WardenLeaveRecord> _allLeaves = [];
   bool _isLoading = true;
 
   @override
@@ -28,20 +30,23 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     _fetchLeaves();
   }
 
-  /// ✅ Fetches leaves using the correct service method
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  /// ✅ Fetches leaves and maps them to the WardenLeaveRecord model
   Future<void> _fetchLeaves() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     
     try {
-      // Calling the method we fixed in api_service.dart
       final response = await apiService.getWardenLeaveRequests(); 
       
-      if (mounted) {
+      if (mounted && response != null) {
         setState(() {
-          if (response != null && response['success'] == true) {
-            _allLeaves = response['data'] ?? [];
-          }
+          _allLeaves = response.data ?? [];
           _isLoading = false;
         });
       }
@@ -51,8 +56,8 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     }
   }
 
-  /// ✅ FIXED: Matches the ApiService method signature
-  Future<void> _handleAction(dynamic leave, bool approve) async {
+  /// ✅ FIXED: Now passes both Student ID and Leave ID as required by your API
+  Future<void> _handleAction(WardenLeaveRecord leave, bool approve) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -60,18 +65,18 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     );
 
     try {
-      // Parse the ID safely
-      final int leaveId = int.tryParse(leave['id'].toString()) ?? 0;
+      final int leaveId = leave.id ?? 0;
+      final int studentId = leave.student?.id ?? 0;
 
-      if (leaveId == 0) {
-        throw Exception("Invalid Leave ID");
+      if (leaveId == 0 || studentId == 0) {
+        throw Exception("Invalid Student or Leave ID");
       }
 
       bool success = false;
 
-      // Use the specific method based on the action
       if (approve) {
-        success = await apiService.wardenApproveLeave(leaveId);
+        // ✅ Matches updated ApiService: wardenApproveLeave(studentId, leaveId)
+        success = await apiService.wardenApproveLeave(studentId, leaveId);
       } else {
         success = await apiService.wardenRejectLeave(leaveId);
       }
@@ -84,9 +89,9 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
           "Leave ${approve ? 'Approved' : 'Rejected'} Successfully", 
           approve ? successGreen : Colors.redAccent
         );
-        _fetchLeaves(); // Refresh the list
+        _fetchLeaves(); // Refresh the list from server
       } else {
-        _showSnackBar("Failed to process request. Please try again.", Colors.orange);
+        _showSnackBar("Action failed. Request might already be processed.", Colors.orange);
       }
     } catch (e) {
       if (mounted) {
@@ -148,10 +153,12 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
 
   Widget _buildLeaveList({required String filterStatus}) {
     final filteredList = _allLeaves.where((l) {
-      final status = l['status'].toString().toLowerCase();
+      final status = (l.status ?? "").toLowerCase();
       if (filterStatus == "pending") {
+        // Show anything that needs Warden attention
         return status == "pending" || status == "waiting" || status == "parent_approved";
       } else {
+        // Show processed items
         return status == "approved" || status == "rejected" || status == "manager_approved";
       }
     }).toList();
@@ -182,10 +189,9 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     );
   }
 
-  Widget _buildLeaveCard(dynamic leave, bool isPending) {
-    // Handling nested student object if present, otherwise using top-level keys
-    final studentName = leave['student_name'] ?? (leave['student'] != null ? leave['student']['name'] : "Student");
-    final studentId = leave['user_id'] ?? (leave['student'] != null ? leave['student']['id'] : "N/A");
+  Widget _buildLeaveCard(WardenLeaveRecord leave, bool isPending) {
+    final studentName = leave.student?.email?.split('@')[0] ?? "Student";
+    final studentEmail = leave.student?.email ?? "N/A";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -219,10 +225,10 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(studentName.toString(), 
+                                  Text(studentName.toUpperCase(), 
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: textDark)),
-                                  Text("ID: $studentId", 
+                                  Text(studentEmail, 
                                     style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                 ],
                               ),
@@ -230,14 +236,16 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                           ],
                         ),
                       ),
-                      _statusChip(leave['status'].toString().toUpperCase()),
+                      _statusChip((leave.status ?? "PENDING").toUpperCase()),
                     ],
                   ),
                   const Divider(height: 25),
-                  _infoRow(Icons.calendar_month_rounded, "Dates", 
-                      "${leave['start_date'].toString().split(' ')[0]} to ${leave['end_date'].toString().split(' ')[0]}"),
+                  _infoRow(Icons.calendar_month_rounded, "Requested Date", 
+                      leave.startDate ?? "N/A"),
                   const SizedBox(height: 8),
-                  _infoRow(Icons.info_outline_rounded, "Reason", leave['reason'] ?? "N/A"),
+                  _infoRow(Icons.category_outlined, "Type", leave.leaveType?.toUpperCase() ?? "GENERAL"),
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.info_outline_rounded, "Reason", leave.reason ?? "No reason provided"),
                 ],
               ),
             ),
@@ -247,7 +255,7 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
                   Expanded(
                     child: _actionButton("REJECT", Colors.redAccent, () => _handleAction(leave, false)),
                   ),
-                  const SizedBox(width: 1), 
+                  Container(width: 1, height: 30, color: Colors.grey.shade100), 
                   Expanded(
                     child: _actionButton("APPROVE", successGreen, () => _handleAction(leave, true)),
                   ),
@@ -263,13 +271,13 @@ class _WardenStdLeaveApprovePageState extends State<WardenStdLeaveApprovePage> w
     return InkWell(
       onTap: onTap,
       child: Container(
-        height: 50,
+        height: 55,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(0.05),
           border: Border(top: BorderSide(color: Colors.grey.shade100)),
         ),
-        child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+        child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
       ),
     );
   }

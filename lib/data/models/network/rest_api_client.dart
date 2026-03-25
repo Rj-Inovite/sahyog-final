@@ -11,8 +11,10 @@ import 'package:my_app/data/models/warden_list_response.dart';
 import 'package:my_app/data/models/child_profile_response.dart'; 
 import 'package:my_app/data/models/network/parent_leave_list.dart';
 import 'package:my_app/data/models/network/attendance_response.dart';
-// ✅ Corrected import for your new chat response model
 import 'package:my_app/data/models/network/chat_response.dart'; 
+
+// ✅ Correct Warden-specific model import
+import 'package:my_app/data/models/network/warden_leave_response.dart';
 
 part 'rest_api_client.g.dart';
 
@@ -34,9 +36,17 @@ abstract class RestAPIClient {
   @GET("hostel/attendance")
   Future<AttendanceResponse> getAttendance();
 
-  /// ✅ Integrated Warden Leave Actions
+  /// ✅ Fetches student leave requests for Warden
+  @GET("hostel/student-leaves")
+  Future<WardenLeaveResponse> getWardenLeaveHistory();
+
+  /// ✅ Corrected: Matches Postman form-data requirements
   @POST("warden/leave/approve")
-  Future<dynamic> wardenApproveLeave(@Body() Map<String, dynamic> body);
+  @MultiPart()
+  Future<dynamic> wardenApproveLeave(
+    @Part(name: "student_id") int studentId,
+    @Part(name: "leave_id") int leaveId,
+  );
 
   @POST("warden/leave/{id}/reject")
   Future<dynamic> wardenRejectLeave(@Path("id") int id);
@@ -99,8 +109,6 @@ abstract class RestAPIClient {
   @POST("chat/setup")
   Future<dynamic> setupConversation(@Body() Map<String, dynamic> body);
 
-  /// ✅ Warden Chat Send API
-  /// Uses the new ChatResponse model for proper typed data handling
   @POST("chat/send")
   Future<ChatResponse> sendWardenMessage(@Body() Map<String, dynamic> body);
 

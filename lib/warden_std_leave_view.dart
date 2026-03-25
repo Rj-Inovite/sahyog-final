@@ -5,8 +5,9 @@ import 'dart:ui';
 import 'package:intl/intl.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
-// ✅ Custom import for your API service
+// ✅ Custom imports - Ensure these paths match your project structure
 import 'package:my_app/data/models/network/api_service.dart';
+import 'package:my_app/data/models/network/warden_leave_response.dart';
 
 // --- SAHYOG DESIGN SYSTEM ---
 const Color primaryIndigo = Color(0xFF1A237E);
@@ -26,7 +27,8 @@ class WardenStdLeaveView extends StatefulWidget {
 
 class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
   bool _isLoading = true;
-  List<dynamic> _leaveRequests = []; 
+  // ✅ Typed list from your WardenLeaveResponse model
+  List<WardenLeaveRecord> _leaveRequests = []; 
   Timer? _autoRefreshTimer;
   int _secondsRemaining = 10;
 
@@ -63,38 +65,51 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
   Future<void> _fetchLeaveRequests({bool isSilent = false}) async {
     if (!isSilent) setState(() => _isLoading = true);
     try {
+      // ✅ Using the integrated getWardenLeaveRequests from ApiService
       final response = await apiService.getWardenLeaveRequests(); 
-      if (mounted && response != null && response['success'] == true) {
+      if (mounted) {
         setState(() {
-          _leaveRequests = response['data'] ?? [];
+          _leaveRequests = response?.data ?? [];
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("API Error: $e");
+      debugPrint("Warden View Fetch Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- APPROVE (API) / REJECT (LOCAL UI) ---
-  Future<void> _processAction(dynamic leave, String action) async {
-    final int leaveId = leave['id'];
+  // --- APPROVE / REJECT ACTIONS ---
+  Future<void> _processAction(WardenLeaveRecord leave, String action) async {
+    // Safety check for IDs
+    final int leaveId = leave.id ?? 0;
+    final int studentId = leave.studentId ?? leave.student?.id ?? 0;
+
+    if (leaveId == 0) {
+      _showFeedback("Error: Invalid Leave ID", softRed);
+      return;
+    }
+
     try {
+      bool success = false;
       if (action == "Approved") {
-        bool success = await apiService.wardenApproveLeave(leaveId);
-        if (success && mounted) {
-          _showFeedback("Leave Approved Successfully", softGreen);
-          _fetchLeaveRequests(isSilent: true);
-        }
+        // ✅ Calls the service we updated with studentId and leaveId
+        success = await apiService.wardenApproveLeave(studentId, leaveId);
       } else {
-        // UI Mock for Reject (Since API is not ready)
-        setState(() {
-          _leaveRequests.removeWhere((item) => item['id'] == leaveId);
-        });
-        _showFeedback("Leave Rejected (UI Only)", softRed);
+        // ✅ Calls the rejection endpoint
+        success = await apiService.wardenRejectLeave(leaveId);
+      }
+
+      if (success && mounted) {
+        _showFeedback("Leave $action Successfully", action == "Approved" ? softGreen : softRed);
+        // Refresh the list immediately after action
+        _fetchLeaveRequests(isSilent: true);
+      } else if (mounted) {
+        _showFeedback("Action failed. Server returned an error.", warningOrange);
       }
     } catch (e) {
-      _showFeedback("Request failed. Try again.", Colors.black87);
+      debugPrint("Action Error: $e");
+      _showFeedback("Connection failed. Try again.", Colors.black87);
     }
   }
 
@@ -110,9 +125,9 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
     );
   }
 
-  // --- NEW: LEAVE DETAILS POPUP ---
-  void _showLeaveDetails(dynamic leave) {
-    final student = leave['student'] ?? {};
+  // --- LEAVE DETAILS POPUP ---
+  void _showLeaveDetails(WardenLeaveRecord leave) {
+    final student = leave.student;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -133,22 +148,25 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
               const SizedBox(height: 25),
               const Text("Request Details", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: primaryIndigo)),
               const Divider(height: 30),
-              _detailItem(Icons.alternate_email, "Student Email", student['email'] ?? "N/A"),
-              _detailItem(Icons.fingerprint, "Student ID", student['id']?.toString() ?? "N/A"),
-              _detailItem(Icons.category_outlined, "Leave Type", leave['leave_type']?.toString().toUpperCase() ?? "GENERAL"),
-              _detailItem(Icons.event_available, "Date Requested", leave['start_date'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(leave['start_date'])) : "N/A"),
-              _detailItem(Icons.info_outline, "Status", leave['status']?.toString().toUpperCase() ?? "PENDING"),
-              const SizedBox(height: 10),
+              _detailItem(Icons.person_outline, "Student Name", student?.name ?? "N/A"),
+              _detailItem(Icons.alternate_email, "Student Email", student?.email ?? "N/A"),
+              _detailItem(Icons.fingerprint, "Student ID", student?.id?.toString() ?? "N/A"),
+              _detailItem(Icons.category_outlined, "Leave Type", leave.leaveType?.toUpperCase() ?? "GENERAL"),
+              _detailItem(Icons.event, "Duration", "${leave.startDate ?? 'N/A'} to ${leave.endDate ?? 'N/A'}"),
+              _detailItem(Icons.info_outline, "Current Status", leave.status?.toUpperCase() ?? "PENDING"),
+              const SizedBox(height: 15),
               const Text("Reason for Leave:", style: TextStyle(fontWeight: FontWeight.bold, color: primaryIndigo)),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(color: backgroundWhite, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey[200]!)),
-                child: Text(leave['reason'] ?? "No reason provided by student.", style: const TextStyle(color: textGrey, height: 1.5)),
+                child: Text(leave.reason ?? "No reason provided by student.", style: const TextStyle(color: textGrey, height: 1.5)),
               ),
               const SizedBox(height: 30),
-              if (leave['status'] == 'pending' || leave['status'] == 'parent_approved')
+              
+              // Only show action buttons if the leave is not already finalized
+              if (leave.status != 'approved' && leave.status != 'rejected')
                 Row(
                   children: [
                     Expanded(child: _actionBtn("Reject", softRed, Icons.close, () { Navigator.pop(context); _processAction(leave, "Rejected"); })),
@@ -166,7 +184,7 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
 
   Widget _detailItem(IconData icon, String title, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           Icon(icon, size: 18, color: accentBlue),
@@ -192,7 +210,9 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
             _buildSyncHeader(),
             _isLoading && _leaveRequests.isEmpty
                 ? const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: primaryIndigo)))
-                : _leaveRequests.isEmpty ? SliverFillRemaining(child: _buildEmptyState()) : _buildLeaveList(),
+                : _leaveRequests.isEmpty 
+                    ? SliverFillRemaining(child: _buildEmptyState()) 
+                    : _buildLeaveList(),
           ],
         ),
       ),
@@ -203,7 +223,7 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
     return SliverAppBar(
       expandedHeight: 110.0, pinned: true, elevation: 0, backgroundColor: primaryIndigo, centerTitle: true,
       leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20), onPressed: () => Navigator.pop(context)),
-      flexibleSpace: const FlexibleSpaceBar(title: Text("Leave Management", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16))),
+      flexibleSpace: const FlexibleSpaceBar(title: Text("Student Leaves", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16))),
     );
   }
 
@@ -214,8 +234,8 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("NEXT SYNC: ${_secondsRemaining}s", style: const TextStyle(color: textGrey, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
-            const Row(children: [Icon(Icons.circle, size: 8, color: softGreen), SizedBox(width: 5), Text("LIVE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold))]),
+            Text("REFRESHING IN: ${_secondsRemaining}s", style: const TextStyle(color: textGrey, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const Row(children: [Icon(Icons.circle, size: 8, color: softGreen), SizedBox(width: 5), Text("LIVE DATA", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold))]),
           ],
         ),
       ),
@@ -239,37 +259,40 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
     );
   }
 
-  Widget _buildLeaveCard(dynamic leave) {
-    final student = leave['student'] ?? {};
-    final String status = leave['status'] ?? 'pending';
+  Widget _buildLeaveCard(WardenLeaveRecord leave) {
+    final student = leave.student;
+    final String status = leave.status ?? 'pending';
     
     return GestureDetector(
-      onTap: () => _showLeaveDetails(leave), // ✅ Opens Detail Popup
+      onTap: () => _showLeaveDetails(leave), 
       child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 8))],
+          color: Colors.white, borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           children: [
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              leading: CircleAvatar(backgroundColor: primaryIndigo.withOpacity(0.05), child: const Icon(Icons.person_rounded, color: primaryIndigo)),
-              title: Text(student['email'] ?? 'New Student', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-              subtitle: Text(leave['leave_type']?.toString().toUpperCase() ?? 'GENERAL', style: const TextStyle(fontSize: 11, color: accentBlue, fontWeight: FontWeight.bold)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: CircleAvatar(
+                backgroundColor: primaryIndigo.withOpacity(0.1), 
+                child: Text(student?.name?.substring(0, 1).toUpperCase() ?? "S", style: const TextStyle(color: primaryIndigo, fontWeight: FontWeight.bold))
+              ),
+              title: Text(student?.name ?? student?.email ?? 'Unknown Student', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+              subtitle: Text(leave.leaveType?.toUpperCase() ?? 'GENERAL LEAVE', style: const TextStyle(fontSize: 11, color: accentBlue, fontWeight: FontWeight.bold)),
               trailing: _buildStatusChip(status),
             ),
             const Divider(indent: 20, endIndent: 20, height: 1),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, size: 14, color: textGrey),
-                  const SizedBox(width: 8),
-                  Text(leave['start_date'] != null ? DateFormat('EEE, dd MMM').format(DateTime.parse(leave['start_date'])) : "N/A", style: const TextStyle(fontSize: 12, color: textGrey)),
+                  const Icon(Icons.calendar_month, size: 14, color: textGrey),
+                  const SizedBox(width: 6),
+                  Text(leave.startDate ?? "N/A", style: const TextStyle(fontSize: 12, color: textGrey)),
                   const Spacer(),
-                  const Text("View Details", style: TextStyle(color: primaryIndigo, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const Text("Review", style: TextStyle(color: primaryIndigo, fontSize: 12, fontWeight: FontWeight.bold)),
                   const Icon(Icons.chevron_right, size: 16, color: primaryIndigo),
                 ],
               ),
@@ -295,13 +318,22 @@ class _WardenStdLeaveViewState extends State<WardenStdLeaveView> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color.withOpacity(0.1), foregroundColor: color, elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        minimumSize: const Size(double.infinity, 48),
+        minimumSize: const Size(double.infinity, 50),
         side: BorderSide(color: color.withOpacity(0.2)),
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, size: 80, color: primaryIndigo.withOpacity(0.1)), const SizedBox(height: 15), const Text("No Pending Leaves", style: TextStyle(fontWeight: FontWeight.bold, color: primaryIndigo))]));
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center, 
+        children: [
+          Icon(Icons.assignment_turned_in_outlined, size: 70, color: primaryIndigo.withOpacity(0.1)), 
+          const SizedBox(height: 15), 
+          const Text("Clear! No pending requests.", style: TextStyle(fontWeight: FontWeight.bold, color: primaryIndigo))
+        ]
+      )
+    );
   }
 }
