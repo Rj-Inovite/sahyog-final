@@ -15,6 +15,8 @@ import 'package:my_app/data/models/network/chat_response.dart';
 
 // ✅ Correct Warden-specific model import
 import 'package:my_app/data/models/network/warden_leave_response.dart';
+// ✅ New Chat Send Model
+import 'package:my_app/data/models/network/student_chat_send_response.dart';
 
 part 'rest_api_client.g.dart';
 
@@ -106,6 +108,10 @@ abstract class RestAPIClient {
 
   // ================= CHAT APIS =================
   
+  /// ✅ NEW: Dedicated Chat Send API with type safety
+  @POST("chat/send")
+  Future<StudentChatSendResponse> sendChatMessage(@Body() Map<String, dynamic> body);
+
   @POST("chat/setup")
   Future<dynamic> setupConversation(@Body() Map<String, dynamic> body);
 

@@ -26,6 +26,7 @@ Map<String, dynamic> _$WardenLeaveResponseToJson(
 WardenLeaveRecord _$WardenLeaveRecordFromJson(Map<String, dynamic> json) =>
     WardenLeaveRecord(
       id: (json['id'] as num?)?.toInt(),
+      studentId: (json['student_id'] as num?)?.toInt(),
       leaveType: json['leave_type'] as String?,
       startDate: json['start_date'] as String?,
       endDate: json['end_date'] as String?,
@@ -42,6 +43,7 @@ WardenLeaveRecord _$WardenLeaveRecordFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$WardenLeaveRecordToJson(WardenLeaveRecord instance) =>
     <String, dynamic>{
       'id': instance.id,
+      'student_id': instance.studentId,
       'leave_type': instance.leaveType,
       'start_date': instance.startDate,
       'end_date': instance.endDate,
@@ -56,6 +58,7 @@ WardenStudentDetail _$WardenStudentDetailFromJson(Map<String, dynamic> json) =>
     WardenStudentDetail(
       id: (json['id'] as num?)?.toInt(),
       email: json['email'] as String?,
+      name: json['name'] as String?,
       hostelId: (json['hostel_id'] as num?)?.toInt(),
     );
 
@@ -64,5 +67,6 @@ Map<String, dynamic> _$WardenStudentDetailToJson(
     <String, dynamic>{
       'id': instance.id,
       'email': instance.email,
+      'name': instance.name,
       'hostel_id': instance.hostelId,
     };

@@ -18,6 +18,7 @@ import 'package:my_app/data/models/network/attendance_response.dart';
 import 'package:my_app/data/models/network/chat_response.dart'; 
 // Integrated Warden Response Model for type safety
 import 'package:my_app/data/models/network/warden_leave_response.dart';
+import 'package:my_app/data/models/network/student_chat_send_response.dart';
 
 // --- CLIENTS & STORAGE ---
 import 'rest_api_client.dart';
@@ -120,16 +121,16 @@ class ApiService {
     }
   }
 
-  /// ✅ ELABORATED: Get Warden Leave Requests with proper model mapping
+  /// ✅ CORRECTED: Get Warden Leave Requests with proper model mapping
   Future<WardenLeaveResponse?> getWardenLeaveRequests() async {
     try {
-      // First try standard warden endpoint, then manager fallback
+      // First try standard warden endpoint
       final response = await _dio.get("warden/leaves");
       if (response.statusCode == 200 && response.data != null) {
         return WardenLeaveResponse.fromJson(response.data);
       }
       
-      // Fallback for Manager roles
+      // Fallback for Manager roles if 404/403
       final responseFallback = await _dio.get("manager/leaves");
       if (responseFallback.statusCode == 200 && responseFallback.data != null) {
         return WardenLeaveResponse.fromJson(responseFallback.data);
@@ -142,43 +143,46 @@ class ApiService {
     }
   }
 
-  /// ✅ FULLY INTEGRATED: Action for Warden Approval
+  /// ✅ CORRECTED: Integrated Action for Warden Approval
   Future<bool> wardenApproveLeave(int studentId, int leaveId) async {
     try {
-      final response = await _dio.post(
-        "warden/leave/approve",
-        data: {"student_id": studentId, "leave_id": leaveId},
-      );
+      final payload = {"student_id": studentId, "leave_id": leaveId};
       
-      // If warden endpoint doesn't exist, try manager endpoint
+      final response = await _dio.post("warden/leave/approve", data: payload);
+      
+      // If warden endpoint doesn't exist (404), try manager endpoint fallback
       if (response.statusCode == 404) {
-        final managerResponse = await _dio.post(
-          "manager/leave/approve",
-          data: {"student_id": studentId, "leave_id": leaveId},
-        );
+        final managerResponse = await _dio.post("manager/leave/approve", data: payload);
         return (managerResponse.statusCode == 200 && managerResponse.data['success'] == true);
       }
       
       return (response.statusCode == 200 && response.data['success'] == true);
+    } on DioException catch (e) {
+      _handleDioError("Warden Approve", e);
+      return false;
     } catch (e) {
-      _handleDioError("Warden Approve", e as DioException);
+      debugPrint("Warden Approve General Error: $e");
       return false;
     }
   }
 
-  /// ✅ FULLY INTEGRATED: Action for Warden Rejection
+  /// ✅ CORRECTED: Integrated Action for Warden Rejection
   Future<bool> wardenRejectLeave(int leaveId) async {
     try {
       final response = await _dio.post("warden/leave/$leaveId/reject");
       
+      // If 404, try manager endpoint
       if (response.statusCode == 404) {
         final managerResponse = await _dio.post("manager/leave/$leaveId/reject");
         return (managerResponse.statusCode == 200 && managerResponse.data['success'] == true);
       }
       
       return (response.statusCode == 200 && response.data['success'] == true);
+    } on DioException catch (e) {
+      _handleDioError("Warden Reject", e);
+      return false;
     } catch (e) {
-      _handleDioError("Warden Reject", e as DioException);
+      debugPrint("Warden Reject General Error: $e");
       return false;
     }
   }
@@ -354,6 +358,34 @@ class ApiService {
 
   // ================= CHAT APIS =================
 
+  /// ✅ INTEGRATED: New Send Chat API for Warden/Student
+  Future<StudentChatSendResponse?> sendChatMessage({
+    required int recipientId,
+    required String content,
+    String type = "text",
+  }) async {
+    try {
+      final Map<String, dynamic> body = {
+        "recipient_id": recipientId,
+        "type": type,
+        "content": content,
+      };
+
+      final response = await _dio.post("chat/send", data: body);
+
+      if (response.statusCode == 200 && response.data != null) {
+        return StudentChatSendResponse.fromJson(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      _handleDioError("Chat Send", e);
+      return null;
+    } catch (e) {
+      debugPrint("Chat Send General Error: $e");
+      return null;
+    }
+  }
+
   Future<dynamic> setupChat() async {
     try {
       return await client.setupConversation({"name": "General Chat Room", "type": "group"});
@@ -390,7 +422,8 @@ class ApiService {
 
   Future<dynamic> editMessage(int messageId, String newText) async {
     try {
-      return await _dio.put("chat/messages/$messageId", data: {"message": newText});
+      final response = await _dio.put("chat/messages/$messageId", data: {"message": newText});
+      return response.data;
     } catch (e) { return null; }
   }
 

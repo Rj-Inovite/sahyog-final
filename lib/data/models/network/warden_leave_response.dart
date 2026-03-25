@@ -5,8 +5,10 @@ part 'warden_leave_response.g.dart';
 @JsonSerializable()
 class WardenLeaveResponse {
   final bool? success;
+  
   @JsonKey(name: 'hostel_id')
   final int? hostelId;
+  
   final List<WardenLeaveRecord>? data;
 
   WardenLeaveResponse({
@@ -24,19 +26,26 @@ class WardenLeaveResponse {
 @JsonSerializable()
 class WardenLeaveRecord {
   final int? id;
+
+  // ✅ ADDED: student_id to resolve the 'studentId' isn't defined error in your View
+  @JsonKey(name: 'student_id')
+  final int? studentId;
+
   @JsonKey(name: 'leave_type')
   final String? leaveType;
+
   @JsonKey(name: 'start_date')
   final String? startDate;
+
   @JsonKey(name: 'end_date')
   final String? endDate;
+
   final String? reason;
   final String? status;
   
   @JsonKey(name: 'parent_approved_at')
   final String? parentApprovedAt;
   
-  // ✅ FIXED: Changed parameter name from manager_approved_at to match the field
   @JsonKey(name: 'manager_approved_at')
   final String? managerApprovedAt;
 
@@ -45,13 +54,14 @@ class WardenLeaveRecord {
 
   WardenLeaveRecord({
     this.id,
+    this.studentId, // ✅ Included in constructor
     this.leaveType,
     this.startDate,
     this.endDate,
     this.reason,
     this.status,
     this.parentApprovedAt,
-    this.managerApprovedAt, // ✅ Matches final variable name
+    this.managerApprovedAt,
     this.student,
   });
 
@@ -65,10 +75,19 @@ class WardenLeaveRecord {
 class WardenStudentDetail {
   final int? id;
   final String? email;
+  
+  // ✅ ADDED: name field because your UI code uses student?.name
+  final String? name;
+
   @JsonKey(name: 'hostel_id')
   final int? hostelId;
 
-  WardenStudentDetail({this.id, this.email, this.hostelId});
+  WardenStudentDetail({
+    this.id, 
+    this.email, 
+    this.name, // ✅ Added to constructor
+    this.hostelId,
+  });
 
   factory WardenStudentDetail.fromJson(Map<String, dynamic> json) =>
       _$WardenStudentDetailFromJson(json);

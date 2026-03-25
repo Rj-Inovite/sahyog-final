@@ -68,6 +68,13 @@ class AuthLocalStorage {
     return prefs.getString(_userIdKey);
   }
 
+  /// NEW HELPER: Returns User ID as an Integer (Useful for Chat/API calls)
+  static Future<int?> getUserIdInt() async {
+    final idStr = await getUserId();
+    if (idStr == null) return null;
+    return int.tryParse(idStr);
+  }
+
   static Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userRoleKey);
@@ -98,6 +105,14 @@ class AuthLocalStorage {
     final role = (await getUserRole())?.toLowerCase().trim();
     return role == 'parent' || role == 'guardian';
   }
+
+  /// Specific check for Student role.
+  static Future<bool> isStudent() async {
+    final role = (await getUserRole())?.toLowerCase().trim();
+    return role == 'student';
+  }
+
+  // ================= CLEANUP METHODS =================
 
   /// Safe Logout: Removes credentials but keeps app settings.
   static Future<void> clearAuthData() async {
